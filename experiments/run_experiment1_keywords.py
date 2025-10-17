@@ -201,15 +201,19 @@ def calculate_keyword_overlap(keywords1: List[str], keywords2: List[str]) -> Dic
     union = set1.union(set2)
     
     jaccard = len(intersection) / len(union) if union else 0.0
-    precision = len(intersection) / len(set1) if set1 else 0.0
-    recall = len(intersection) / len(set2) if set2 else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+    
+    # Меры пересечения (НЕ классические метрики классификации!)
+    overlap_human = len(intersection) / len(set1) if set1 else 0.0  # Доля человеческих слов в синтетических
+    overlap_synthetic = len(intersection) / len(set2) if set2 else 0.0  # Доля синтетических слов в человеческих
+    
+    # Гармоническое среднее пересечений
+    harmonic_mean = 2 * overlap_human * overlap_synthetic / (overlap_human + overlap_synthetic) if (overlap_human + overlap_synthetic) > 0 else 0.0
     
     return {
         'jaccard': jaccard,
-        'precision': precision,
-        'recall': recall,
-        'f1': f1,
+        'overlap_human': overlap_human,  # Было "precision"
+        'overlap_synthetic': overlap_synthetic,  # Было "recall" 
+        'harmonic_mean': harmonic_mean,  # Было "f1"
         'intersection_size': len(intersection),
         'set1_size': len(set1),
         'set2_size': len(set2)
@@ -267,18 +271,18 @@ def create_visualizations(results: Dict, output_dir: str):
     
     # Подготовка данных
     jaccard_scores = []
-    f1_scores = []
-    precision_scores = []
-    recall_scores = []
+    harmonic_means = []
+    overlap_human_scores = []
+    overlap_synthetic_scores = []
     
     for topic in topics:
         for method in methods:
             if topic in results and method in results[topic]:
                 overlap = results[topic][method]['overlap_metrics']
                 jaccard_scores.append(overlap['jaccard'])
-                f1_scores.append(overlap['f1'])
-                precision_scores.append(overlap['precision'])
-                recall_scores.append(overlap['recall'])
+                harmonic_means.append(overlap['harmonic_mean'])
+                overlap_human_scores.append(overlap['overlap_human'])
+                overlap_synthetic_scores.append(overlap['overlap_synthetic'])
     
     # График Jaccard Index
     ax1 = axes[0, 0]
@@ -293,9 +297,9 @@ def create_visualizations(results: Dict, output_dir: str):
     
     # График F1-score
     ax2 = axes[0, 1]
-    bars2 = ax2.bar(x_pos, f1_scores, color=['#1f77b4', '#ff7f0e', '#2ca02c'] * 2)
-    ax2.set_title('F1-score по методам и темам')
-    ax2.set_ylabel('F1-score')
+    bars2 = ax2.bar(x_pos, harmonic_means, color=['#1f77b4', '#ff7f0e', '#2ca02c'] * 2)
+    ax2.set_title('Harmonic Mean по методам и темам')
+    ax2.set_ylabel('Harmonic Mean')
     ax2.set_xticks([0.5, 1.5, 2.5, 3.5, 4.5, 5.5])
     ax2.set_xticklabels(['N-grams\nTM', 'YAKE\nTM', 'TextRank\nTM', 
                         'N-grams\nIR', 'YAKE\nIR', 'TextRank\nIR'])
@@ -303,9 +307,9 @@ def create_visualizations(results: Dict, output_dir: str):
     
     # График Precision
     ax3 = axes[1, 0]
-    bars3 = ax3.bar(x_pos, precision_scores, color=['#1f77b4', '#ff7f0e', '#2ca02c'] * 2)
-    ax3.set_title('Precision по методам и темам')
-    ax3.set_ylabel('Precision')
+    bars3 = ax3.bar(x_pos, overlap_human_scores, color=['#1f77b4', '#ff7f0e', '#2ca02c'] * 2)
+    ax3.set_title('Overlap Human по методам и темам')
+    ax3.set_ylabel('Overlap Human')
     ax3.set_xticks([0.5, 1.5, 2.5, 3.5, 4.5, 5.5])
     ax3.set_xticklabels(['N-grams\nTM', 'YAKE\nTM', 'TextRank\nTM', 
                         'N-grams\nIR', 'YAKE\nIR', 'TextRank\nIR'])
@@ -313,9 +317,9 @@ def create_visualizations(results: Dict, output_dir: str):
     
     # График Recall
     ax4 = axes[1, 1]
-    bars4 = ax4.bar(x_pos, recall_scores, color=['#1f77b4', '#ff7f0e', '#2ca02c'] * 2)
-    ax4.set_title('Recall по методам и темам')
-    ax4.set_ylabel('Recall')
+    bars4 = ax4.bar(x_pos, overlap_synthetic_scores, color=['#1f77b4', '#ff7f0e', '#2ca02c'] * 2)
+    ax4.set_title('Overlap Synthetic по методам и темам')
+    ax4.set_ylabel('Overlap Synthetic')
     ax4.set_xticks([0.5, 1.5, 2.5, 3.5, 4.5, 5.5])
     ax4.set_xticklabels(['N-grams\nTM', 'YAKE\nTM', 'TextRank\nTM', 
                         'N-grams\nIR', 'YAKE\nIR', 'TextRank\nIR'])
@@ -482,9 +486,9 @@ def generate_markdown_report(results: Dict, output_path: str):
                 overlap = method_results['overlap_metrics']
                 f.write("**Метрики пересечения:**\n")
                 f.write(f"- Jaccard Index: {overlap['jaccard']:.3f}\n")
-                f.write(f"- Precision: {overlap['precision']:.3f}\n")
-                f.write(f"- Recall: {overlap['recall']:.3f}\n")
-                f.write(f"- F1-score: {overlap['f1']:.3f}\n")
+                f.write(f"- Overlap Human: {overlap['overlap_human']:.3f}\n")
+                f.write(f"- Overlap Synthetic: {overlap['overlap_synthetic']:.3f}\n")
+                f.write(f"- Harmonic Mean: {overlap['harmonic_mean']:.3f}\n")
                 f.write(f"- Пересечение: {overlap['intersection_size']} из {overlap['set1_size']} и {overlap['set2_size']}\n\n")
                 
                 # Анализ разнообразия
@@ -514,15 +518,15 @@ def generate_markdown_report(results: Dict, output_path: str):
                 human_div = results[topic][method]['human_diversity']
                 method_stats[method].append({
                     'jaccard': overlap['jaccard'],
-                    'f1': overlap['f1'],
+                    'harmonic_mean': overlap['harmonic_mean'],
                     'unique': human_div['unique_ratio']
                 })
         
         for method, stats in method_stats.items():
             avg_jaccard = np.mean([s['jaccard'] for s in stats])
-            avg_f1 = np.mean([s['f1'] for s in stats])
+            avg_harmonic = np.mean([s['harmonic_mean'] for s in stats])
             avg_unique = np.mean([s['unique'] for s in stats])
-            f.write(f"| {method.upper()} | {avg_jaccard:.3f} | {avg_f1:.3f} | {avg_unique:.3f} |\n")
+            f.write(f"| {method.upper()} | {avg_jaccard:.3f} | {avg_harmonic:.3f} | {avg_unique:.3f} |\n")
         
         f.write("\n")
         
@@ -672,7 +676,7 @@ def main():
             overlap_metrics = calculate_keyword_overlap(human_keywords, synthetic_keywords)
             # Защита от вырожденных метрик: если union пуст или обе выборки пустые, помечаем как NaN
             if (not human_keywords) and (not synthetic_keywords):
-                overlap_metrics.update({'jaccard': float('nan'), 'precision': float('nan'), 'recall': float('nan'), 'f1': float('nan')})
+                overlap_metrics.update({'jaccard': float('nan'), 'overlap_human': float('nan'), 'overlap_synthetic': float('nan'), 'harmonic_mean': float('nan')})
             
             # Анализируем разнообразие
             human_diversity = analyze_keyword_diversity(human_keywords)
@@ -689,7 +693,7 @@ def main():
             }
             
             print(f"    Найдено ключевых слов: человеческие {len(human_keywords)}, синтетические {len(synthetic_keywords)}")
-            print(f"    Jaccard: {overlap_metrics['jaccard']:.3f}, F1: {overlap_metrics['f1']:.3f}")
+            print(f"    Jaccard: {overlap_metrics['jaccard']:.3f}, Harmonic Mean: {overlap_metrics['harmonic_mean']:.3f}")
         
         results[topic] = topic_results
     
