@@ -40,111 +40,111 @@
 **Топ-10 ключевых слов (человеческие тексты):**
 1. model
 2. reasoning
-3. time
-4. llm
+3. models
+4. data
 5. based
-6. using
-7. existing
-8. environments
-9. enables
-10. training
+6. time
+7. using
+8. performance
+9. forecasting
+10. fidelity
 
 **Топ-10 ключевых слов (синтетические тексты):**
-1. framework
+1. model
 2. models
-3. model
-4. learning
-5. focus
-6. language
-7. efficient
-8. time
-9. task
-10. neural
+3. performance
+4. time
+5. existing
+6. neural
+7. research
+8. language
+9. efficient
+10. results
 
 **Метрики пересечения:**
-- Jaccard Index: 0.190
-- Precision: 0.320
-- Recall: 0.320
-- F1-score: 0.320
-- Пересечение: 16 из 50 и 50
+- Jaccard Index: 0.136
+- Precision: 0.240
+- Recall: 0.240
+- F1-score: 0.240
+- Пересечение: 12 из 50 и 50
 
 **Анализ разнообразия:**
-- Человеческие тексты: уникальность 1.000, средняя длина 1.06
-- Синтетические тексты: уникальность 1.000, средняя длина 1.02
+- Человеческие тексты: уникальность 1.000, средняя длина 1.04
+- Синтетические тексты: уникальность 1.000, средняя длина 1.06
 
 #### YAKE
 
 **Топ-10 ключевых слов (человеческие тексты):**
-1. datasets remains laborious
-2. curating large reasoning
-3. large reasoning datasets
-4. Large language models
-5. reasoning datasets remains
-6. demonstrated impressive reasoning
-7. Prompting Test-Time Scaling
-8. Large language
-9. curating large
-10. laborious and resource-intensive
+1. model
+2. problem
+3. performance
+4. datasets remains laborious
+5. curating large reasoning
+6. large reasoning datasets
+7. Large language models
+8. reasoning datasets remains
+9. demonstrated impressive reasoning
+10. Prompting Test-Time Scaling
 
 **Топ-10 ключевых слов (синтетические тексты):**
 1. large language
-2. large language models
-3. learning approaches
-4. automated machine learning
-5. machine learning
-6. distributed computing
-7. study introduces
-8. language processing conferences
-9. top-tier computer vision
-10. multimodal fusion techniques
+2. models
+3. large language models
+4. language
+5. languages
+6. model
+7. learning approaches
+8. automated machine learning
+9. neural network models
+10. machine learning
 
 **Метрики пересечения:**
-- Jaccard Index: 0.031
-- Precision: 0.060
-- Recall: 0.060
-- F1-score: 0.060
-- Пересечение: 3 из 50 и 50
+- Jaccard Index: 0.020
+- Precision: 0.040
+- Recall: 0.040
+- F1-score: 0.040
+- Пересечение: 2 из 50 и 50
 
 **Анализ разнообразия:**
-- Человеческие тексты: уникальность 1.000, средняя длина 2.52
-- Синтетические тексты: уникальность 1.000, средняя длина 2.26
+- Человеческие тексты: уникальность 1.000, средняя длина 2.24
+- Синтетические тексты: уникальность 1.000, средняя длина 2.08
 
 #### TEXTRANK
 
 **Топ-10 ключевых слов (человеческие тексты):**
 1. reasoning
-2. models
-3. model
+2. model
+3. models
 4. training
-5. modeling
-6. generation
-7. learning
-8. data
-9. problems
-10. problem
+5. llm
+6. time
+7. modeling
+8. generation
+9. data
+10. problems
 
 **Топ-10 ключевых слов (синтетические тексты):**
 1. model
 2. models
-3. approaches
+3. adaptive
 4. learning
-5. language
-6. adaptive
-7. increase
-8. bound
-9. existing
-10. including
+5. existing
+6. approaches
+7. including
+8. approach
+9. tasks
+10. framework
 
 **Метрики пересечения:**
-- Jaccard Index: 0.075
-- Precision: 0.140
-- Recall: 0.140
-- F1-score: 0.140
-- Пересечение: 7 из 50 и 50
+- Jaccard Index: 0.099
+- Precision: 0.180
+- Recall: 0.180
+- F1-score: 0.180
+- Пересечение: 9 из 50 и 50
 
 **Анализ разнообразия:**
-- Человеческие тексты: уникальность 1.000, средняя длина 1.06
-- Синтетические тексты: уникальность 1.000, средняя длина 1.06
+- Человеческие тексты: уникальность 1.000, средняя длина 1.10
+- Синтетические тексты: уникальность 1.000, средняя длина 1.00
 
 ---
 
@@ -158,113 +158,113 @@
 #### NGRAMS
 
 **Топ-10 ключевых слов (человеческие тексты):**
-1. data
-2. models
+1. model
+2. data
 3. reasoning
-4. dataset
-5. model
-6. language
-7. retrieval
-8. scale
-9. spatial
-10. knowledge
+4. provides
+5. models
+6. dataset
+7. introduce
+8. yields
+9. physics
+10. time
 
 **Топ-10 ключевых слов (синтетические тексты):**
-1. framework
-2. geometric
-3. real
-4. proposed
-5. multi
-6. anchors
-7. universe
-8. cosmological
-9. reconstruction
-10. distance
+1. geometric
+2. time
+3. model
+4. including
+5. new
+6. informed
+7. hierarchical
+8. real
+9. based
+10. multi
 
 **Метрики пересечения:**
-- Jaccard Index: 0.136
-- Precision: 0.240
-- Recall: 0.240
-- F1-score: 0.240
-- Пересечение: 12 из 50 и 50
+- Jaccard Index: 0.064
+- Precision: 0.120
+- Recall: 0.120
+- F1-score: 0.120
+- Пересечение: 6 из 50 и 50
 
 **Анализ разнообразия:**
-- Человеческие тексты: уникальность 1.000, средняя длина 1.00
-- Синтетические тексты: уникальность 1.000, средняя длина 1.10
+- Человеческие тексты: уникальность 1.000, средняя длина 1.04
+- Синтетические тексты: уникальность 1.000, средняя длина 1.12
 
 #### YAKE
 
 **Топ-10 ключевых слов (человеческие тексты):**
-1. made significant progress
-2. spatial reasoning explorations
-3. understanding indoor scenes
-4. spatial reasoning
-5. researchers have made
-6. autonomous driving
-7. current surge
-8. made significant
-9. significant progress
-10. progress in understanding
+1. reasoning
+2. data
+3. made significant progress
+4. spatial reasoning explorations
+5. understanding indoor scenes
+6. spatial reasoning
+7. researchers have made
+8. autonomous driving
+9. current surge
+10. made significant
 
 **Топ-10 ключевых слов (синтетические тексты):**
 1. late-time Universe
-2. anchors
-3. matrices
-4. rings
-5. two-qubit entangling gates
-6. gate
-7. two-qubit
-8. kinematic anchors
-9. kinematic
-10. kinematic reconstructions
+2. Universe
+3. anchors
+4. cosmological implications
+5. matrices
+6. rings
+7. algebraic
+8. multimodal
+9. two-qubit entangling gates
+10. two-qubit gates
 
 **Метрики пересечения:**
-- Jaccard Index: 0.000
-- Precision: 0.000
-- Recall: 0.000
-- F1-score: 0.000
-- Пересечение: 0 из 50 и 50
+- Jaccard Index: 0.031
+- Precision: 0.060
+- Recall: 0.060
+- F1-score: 0.060
+- Пересечение: 3 из 50 и 50
 
 **Анализ разнообразия:**
-- Человеческие тексты: уникальность 1.000, средняя длина 2.42
-- Синтетические тексты: уникальность 1.000, средняя длина 2.10
+- Человеческие тексты: уникальность 1.000, средняя длина 2.20
+- Синтетические тексты: уникальность 1.000, средняя длина 2.02
 
 #### TEXTRANK
 
 **Топ-10 ключевых слов (человеческие тексты):**
-1. models
-2. model
-3. modeling
-4. information
-5. learning
+1. model
+2. modeling
+3. models
+4. task
+5. information
 6. extensive
 7. diverse
 8. video
 9. knowledge
-10. data
+10. m
 
 **Топ-10 ключевых слов (синтетические тексты):**
 1. model
 2. significant
 3. models
 4. modeling
-5. new
-6. anchors
-7. algorithms
-8. reconstructions
-9. reconstruction
-10. expansion
+5. sequences
+6. new
+7. anchors
+8. algorithms
+9. reconstructions
+10. reconstruction
 
 **Метрики пересечения:**
-- Jaccard Index: 0.163
-- Precision: 0.280
-- Recall: 0.280
-- F1-score: 0.280
-- Пересечение: 14 из 50 и 50
+- Jaccard Index: 0.149
+- Precision: 0.260
+- Recall: 0.260
+- F1-score: 0.260
+- Пересечение: 13 из 50 и 50
 
 **Анализ разнообразия:**
-- Человеческие тексты: уникальность 1.000, средняя длина 1.06
-- Синтетические тексты: уникальность 1.000, средняя длина 1.20
+- Человеческие тексты: уникальность 1.000, средняя длина 1.04
+- Синтетические тексты: уникальность 1.000, средняя длина 1.04
 
 ---
 
@@ -274,9 +274,9 @@
 
 | Метод | Средний Jaccard | Средний F1 | Средняя уникальность |
 |-------|----------------|------------|---------------------|
-| NGRAMS | 0.163 | 0.280 | 1.000 |
-| YAKE | 0.015 | 0.030 | 1.000 |
-| TEXTRANK | 0.119 | 0.210 | 1.000 |
+| NGRAMS | 0.100 | 0.180 | 1.000 |
+| YAKE | 0.026 | 0.050 | 1.000 |
+| TEXTRANK | 0.124 | 0.220 | 1.000 |
 
 ### Ключевые наблюдения
 

@@ -84,7 +84,14 @@ def preprocess_text(text: str) -> str:
     return text.lower().strip()
 
 
-def extract_ngrams_keywords_per_doc(documents: List[str], ngram_range: Tuple[int, int] = (1, 3), max_features: int = 200, top_per_doc: int = 15) -> Tuple[List[str], Dict[str, int]]:
+def extract_ngrams_keywords_per_doc(
+    documents: List[str],
+    ngram_range: Tuple[int, int] = (1, 3),
+    max_features: int = 500,
+    top_per_doc: int = 20,
+    min_df: int | float = 2,
+    max_df: float = 0.85,
+) -> Tuple[List[str], Dict[str, int]]:
     """Извлекает ключевые слова через TF-IDF n-граммы на уровне документов и агрегирует частоты по документам."""
     try:
         vectorizer = TfidfVectorizer(
@@ -92,7 +99,9 @@ def extract_ngrams_keywords_per_doc(documents: List[str], ngram_range: Tuple[int
             max_features=max_features,
             stop_words='english',
             lowercase=True,
-            preprocessor=preprocess_text
+            preprocessor=preprocess_text,
+            min_df=min_df,
+            max_df=max_df
         )
         tfidf_matrix = vectorizer.fit_transform(documents)
         feature_names = vectorizer.get_feature_names_out()
@@ -119,12 +128,17 @@ def extract_ngrams_keywords_per_doc(documents: List[str], ngram_range: Tuple[int
         return [], {}
 
 
-def extract_yake_keywords_per_doc(documents: List[str], top_per_doc: int = 15, max_ngram_size: int = 3) -> Tuple[List[str], Dict[str, int]]:
+def extract_yake_keywords_per_doc(
+    documents: List[str],
+    top_per_doc: int = 20,
+    max_ngram_size: int = 3,
+    dedup_lim: float = 0.8,
+) -> Tuple[List[str], Dict[str, int]]:
     """YAKE по документам с агрегацией по частоте появления в документах."""
     if not YAKE_AVAILABLE:
         return [], {}
     try:
-        kw_extractor = yake.KeywordExtractor(lan="en", n=max_ngram_size, dedupLim=0.7, top=top_per_doc, features=None)
+        kw_extractor = yake.KeywordExtractor(lan="en", n=max_ngram_size, dedupLim=dedup_lim, top=top_per_doc, features=None)
         docfreq: Dict[str, int] = {}
         for doc in documents:
             try:
@@ -146,7 +160,11 @@ def extract_yake_keywords_per_doc(documents: List[str], top_per_doc: int = 15, m
         return [], {}
 
 
-def extract_textrank_keywords_per_doc(documents: List[str], top_per_doc: int = 15) -> Tuple[List[str], Dict[str, int]]:
+def extract_textrank_keywords_per_doc(
+    documents: List[str],
+    top_per_doc: int = 20,
+    ratio: float | None = 0.2,
+) -> Tuple[List[str], Dict[str, int]]:
     """TextRank по документам с агрегацией по частоте появления в документах."""
     if not TEXTRANK_AVAILABLE:
         return [], {}
@@ -154,8 +172,11 @@ def extract_textrank_keywords_per_doc(documents: List[str], top_per_doc: int = 1
         docfreq: Dict[str, int] = {}
         for doc in documents:
             try:
-                extracted = keywords.keywords(doc, words=top_per_doc)
-                doc_kws = [kw.strip() for kw in extracted.split('\n') if kw.strip()]
+                # Если ratio указан, берём долю слов; иначе фиксированное число слов
+                if ratio is not None:
+                    doc_kws = keywords.keywords(doc, ratio=ratio, split=True)
+                else:
+                    doc_kws = keywords.keywords(doc, words=top_per_doc, split=True)
                 seen = set()
                 for kw in doc_kws:
                     if kw in seen:
@@ -521,6 +542,20 @@ def main():
     parser = argparse.ArgumentParser(description="Эксперимент 1: Анализ ключевых слов")
     parser.add_argument("--output_dir", default="results/experiment1", help="Папка для результатов")
     parser.add_argument("--docs_per_topic", type=int, default=15, help="Количество документов на тему")
+    # Тюнинг экстрактора TF-IDF
+    parser.add_argument("--ngram_min", type=int, default=1)
+    parser.add_argument("--ngram_max", type=int, default=3)
+    parser.add_argument("--tfidf_max_features", type=int, default=500)
+    parser.add_argument("--tfidf_top_per_doc", type=int, default=20)
+    parser.add_argument("--tfidf_min_df", type=float, default=2)
+    parser.add_argument("--tfidf_max_df", type=float, default=0.85)
+    # Тюнинг YAKE
+    parser.add_argument("--yake_top_per_doc", type=int, default=20)
+    parser.add_argument("--yake_max_ngram", type=int, default=3)
+    parser.add_argument("--yake_dedup", type=float, default=0.8)
+    # Тюнинг TextRank
+    parser.add_argument("--textrank_top_per_doc", type=int, default=20)
+    parser.add_argument("--textrank_ratio", type=float, default=0.2)
     args = parser.parse_args()
     
     # Создаем папку для результатов
@@ -590,17 +625,54 @@ def main():
             
             # Ключевые слова и документные частоты
             if method_name == 'ngrams':
-                human_keywords, human_df = extract_ngrams_keywords_per_doc(human_docs)
-                synthetic_keywords, synthetic_df = extract_ngrams_keywords_per_doc(synthetic_docs)
+                # Приводим min_df к int при значениях >= 1
+                tf_min_df = int(args.tfidf_min_df) if args.tfidf_min_df >= 1 else float(args.tfidf_min_df)
+                human_keywords, human_df = extract_ngrams_keywords_per_doc(
+                    human_docs,
+                    ngram_range=(args.ngram_min, args.ngram_max),
+                    max_features=args.tfidf_max_features,
+                    top_per_doc=args.tfidf_top_per_doc,
+                    min_df=tf_min_df,
+                    max_df=args.tfidf_max_df,
+                )
+                synthetic_keywords, synthetic_df = extract_ngrams_keywords_per_doc(
+                    synthetic_docs,
+                    ngram_range=(args.ngram_min, args.ngram_max),
+                    max_features=args.tfidf_max_features,
+                    top_per_doc=args.tfidf_top_per_doc,
+                    min_df=tf_min_df,
+                    max_df=args.tfidf_max_df,
+                )
             elif method_name == 'yake':
-                human_keywords, human_df = extract_yake_keywords_per_doc(human_docs)
-                synthetic_keywords, synthetic_df = extract_yake_keywords_per_doc(synthetic_docs)
+                human_keywords, human_df = extract_yake_keywords_per_doc(
+                    human_docs,
+                    top_per_doc=args.yake_top_per_doc,
+                    max_ngram_size=args.yake_max_ngram,
+                    dedup_lim=args.yake_dedup,
+                )
+                synthetic_keywords, synthetic_df = extract_yake_keywords_per_doc(
+                    synthetic_docs,
+                    top_per_doc=args.yake_top_per_doc,
+                    max_ngram_size=args.yake_max_ngram,
+                    dedup_lim=args.yake_dedup,
+                )
             else:  # textrank
-                human_keywords, human_df = extract_textrank_keywords_per_doc(human_docs)
-                synthetic_keywords, synthetic_df = extract_textrank_keywords_per_doc(synthetic_docs)
+                human_keywords, human_df = extract_textrank_keywords_per_doc(
+                    human_docs,
+                    top_per_doc=args.textrank_top_per_doc,
+                    ratio=args.textrank_ratio,
+                )
+                synthetic_keywords, synthetic_df = extract_textrank_keywords_per_doc(
+                    synthetic_docs,
+                    top_per_doc=args.textrank_top_per_doc,
+                    ratio=args.textrank_ratio,
+                )
             
             # Вычисляем метрики пересечения
             overlap_metrics = calculate_keyword_overlap(human_keywords, synthetic_keywords)
+            # Защита от вырожденных метрик: если union пуст или обе выборки пустые, помечаем как NaN
+            if (not human_keywords) and (not synthetic_keywords):
+                overlap_metrics.update({'jaccard': float('nan'), 'precision': float('nan'), 'recall': float('nan'), 'f1': float('nan')})
             
             # Анализируем разнообразие
             human_diversity = analyze_keyword_diversity(human_keywords)
