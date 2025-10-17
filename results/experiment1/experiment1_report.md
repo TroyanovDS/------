@@ -75,36 +75,76 @@
 #### YAKE
 
 **Топ-10 ключевых слов (человеческие тексты):**
+1. datasets remains laborious
+2. curating large reasoning
+3. large reasoning datasets
+4. Large language models
+5. reasoning datasets remains
+6. demonstrated impressive reasoning
+7. Prompting Test-Time Scaling
+8. Large language
+9. curating large
+10. laborious and resource-intensive
 
 **Топ-10 ключевых слов (синтетические тексты):**
+1. large language
+2. large language models
+3. learning approaches
+4. automated machine learning
+5. machine learning
+6. distributed computing
+7. study introduces
+8. language processing conferences
+9. top-tier computer vision
+10. multimodal fusion techniques
 
 **Метрики пересечения:**
-- Jaccard Index: 0.000
-- Precision: 0.000
-- Recall: 0.000
-- F1-score: 0.000
-- Пересечение: 0 из 0 и 0
+- Jaccard Index: 0.031
+- Precision: 0.060
+- Recall: 0.060
+- F1-score: 0.060
+- Пересечение: 3 из 50 и 50
 
 **Анализ разнообразия:**
-- Человеческие тексты: уникальность 0.000, средняя длина 0.00
-- Синтетические тексты: уникальность 0.000, средняя длина 0.00
+- Человеческие тексты: уникальность 1.000, средняя длина 2.52
+- Синтетические тексты: уникальность 1.000, средняя длина 2.26
 
 #### TEXTRANK
 
 **Топ-10 ключевых слов (человеческие тексты):**
+1. reasoning
+2. models
+3. model
+4. training
+5. modeling
+6. generation
+7. learning
+8. data
+9. problems
+10. problem
 
 **Топ-10 ключевых слов (синтетические тексты):**
+1. model
+2. models
+3. approaches
+4. learning
+5. language
+6. adaptive
+7. increase
+8. bound
+9. existing
+10. including
 
 **Метрики пересечения:**
-- Jaccard Index: 0.000
-- Precision: 0.000
-- Recall: 0.000
-- F1-score: 0.000
-- Пересечение: 0 из 0 и 0
+- Jaccard Index: 0.075
+- Precision: 0.140
+- Recall: 0.140
+- F1-score: 0.140
+- Пересечение: 7 из 50 и 50
 
 **Анализ разнообразия:**
-- Человеческие тексты: уникальность 0.000, средняя длина 0.00
-- Синтетические тексты: уникальность 0.000, средняя длина 0.00
+- Человеческие тексты: уникальность 1.000, средняя длина 1.06
+- Синтетические тексты: уникальность 1.000, средняя длина 1.06
 
 ---
 
@@ -155,36 +195,76 @@
 #### YAKE
 
 **Топ-10 ключевых слов (человеческие тексты):**
+1. made significant progress
+2. spatial reasoning explorations
+3. understanding indoor scenes
+4. spatial reasoning
+5. researchers have made
+6. autonomous driving
+7. current surge
+8. made significant
+9. significant progress
+10. progress in understanding
 
 **Топ-10 ключевых слов (синтетические тексты):**
+1. late-time Universe
+2. anchors
+3. matrices
+4. rings
+5. two-qubit entangling gates
+6. gate
+7. two-qubit
+8. kinematic anchors
+9. kinematic
+10. kinematic reconstructions
 
 **Метрики пересечения:**
 - Jaccard Index: 0.000
 - Precision: 0.000
 - Recall: 0.000
 - F1-score: 0.000
-- Пересечение: 0 из 0 и 0
+- Пересечение: 0 из 50 и 50
 
 **Анализ разнообразия:**
-- Человеческие тексты: уникальность 0.000, средняя длина 0.00
-- Синтетические тексты: уникальность 0.000, средняя длина 0.00
+- Человеческие тексты: уникальность 1.000, средняя длина 2.42
+- Синтетические тексты: уникальность 1.000, средняя длина 2.10
 
 #### TEXTRANK
 
 **Топ-10 ключевых слов (человеческие тексты):**
+1. models
+2. model
+3. modeling
+4. information
+5. learning
+6. extensive
+7. diverse
+8. video
+9. knowledge
+10. data
 
 **Топ-10 ключевых слов (синтетические тексты):**
+1. model
+2. significant
+3. models
+4. modeling
+5. new
+6. anchors
+7. algorithms
+8. reconstructions
+9. reconstruction
+10. expansion
 
 **Метрики пересечения:**
-- Jaccard Index: 0.000
-- Precision: 0.000
-- Recall: 0.000
-- F1-score: 0.000
-- Пересечение: 0 из 0 и 0
+- Jaccard Index: 0.163
+- Precision: 0.280
+- Recall: 0.280
+- F1-score: 0.280
+- Пересечение: 14 из 50 и 50
 
 **Анализ разнообразия:**
-- Человеческие тексты: уникальность 0.000, средняя длина 0.00
-- Синтетические тексты: уникальность 0.000, средняя длина 0.00
+- Человеческие тексты: уникальность 1.000, средняя длина 1.06
+- Синтетические тексты: уникальность 1.000, средняя длина 1.20
 
 ---
 
@@ -195,8 +275,8 @@
 | Метод | Средний Jaccard | Средний F1 | Средняя уникальность |
 |-------|----------------|------------|---------------------|
 | NGRAMS | 0.163 | 0.280 | 1.000 |
-| YAKE | 0.000 | 0.000 | 0.000 |
-| TEXTRANK | 0.000 | 0.000 | 0.000 |
+| YAKE | 0.015 | 0.030 | 1.000 |
+| TEXTRANK | 0.119 | 0.210 | 1.000 |
 
 ### Ключевые наблюдения
 
