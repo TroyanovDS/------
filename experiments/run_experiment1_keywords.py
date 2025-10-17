@@ -15,7 +15,11 @@ from typing import List, Dict, Tuple
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
+try:
+    import seaborn as sns
+    USE_SEABORN = True
+except Exception:
+    USE_SEABORN = False
 import re
 from collections import Counter, defaultdict
 
@@ -80,8 +84,8 @@ def preprocess_text(text: str) -> str:
     return text.lower().strip()
 
 
-def extract_ngrams_keywords(documents: List[str], ngram_range: Tuple[int, int] = (1, 3), max_features: int = 100) -> List[str]:
-    """Извлекает ключевые слова через TF-IDF n-граммы"""
+def extract_ngrams_keywords_per_doc(documents: List[str], ngram_range: Tuple[int, int] = (1, 3), max_features: int = 200, top_per_doc: int = 15) -> Tuple[List[str], Dict[str, int]]:
+    """Извлекает ключевые слова через TF-IDF n-граммы на уровне документов и агрегирует частоты по документам."""
     try:
         vectorizer = TfidfVectorizer(
             ngram_range=ngram_range,
@@ -90,78 +94,81 @@ def extract_ngrams_keywords(documents: List[str], ngram_range: Tuple[int, int] =
             lowercase=True,
             preprocessor=preprocess_text
         )
-        
-        # Объединяем все документы для обучения TF-IDF
-        all_text = ' '.join(documents)
-        tfidf_matrix = vectorizer.fit_transform([all_text])
-        
-        # Получаем топ ключевых слов
+        tfidf_matrix = vectorizer.fit_transform(documents)
         feature_names = vectorizer.get_feature_names_out()
-        scores = tfidf_matrix.toarray()[0]
-        
-        # Сортируем по убыванию TF-IDF
-        keyword_scores = list(zip(feature_names, scores))
-        keyword_scores.sort(key=lambda x: x[1], reverse=True)
-        
-        return [kw for kw, score in keyword_scores[:50]]
+
+        docfreq: Dict[str, int] = {}
+        for row in tfidf_matrix:
+            row_arr = row.toarray()[0]
+            if not np.any(row_arr):
+                continue
+            top_idx = np.argsort(row_arr)[-top_per_doc:][::-1]
+            seen = set()
+            for idx in top_idx:
+                term = feature_names[idx]
+                if term in seen:
+                    continue
+                seen.add(term)
+                docfreq[term] = docfreq.get(term, 0) + 1
+
+        # Топ-50 по частоте по документам
+        top_keywords = [kw for kw, _ in sorted(docfreq.items(), key=lambda x: x[1], reverse=True)[:50]]
+        return top_keywords, docfreq
     except Exception as e:
-        print(f"Error extracting n-grams: {e}")
-        return []
+        print(f"Error extracting n-grams per doc: {e}")
+        return [], {}
 
 
-def extract_yake_keywords(documents: List[str], max_keywords: int = 50) -> List[str]:
-    """Извлекает ключевые слова через YAKE"""
+def extract_yake_keywords_per_doc(documents: List[str], top_per_doc: int = 15, max_ngram_size: int = 3) -> Tuple[List[str], Dict[str, int]]:
+    """YAKE по документам с агрегацией по частоте появления в документах."""
     if not YAKE_AVAILABLE:
-        return []
-    
+        return [], {}
     try:
-        # Объединяем все документы
-        all_text = ' '.join(documents)
-        
-        # Настройки YAKE
-        language = "en"
-        max_ngram_size = 3
-        deduplication_threshold = 0.7
-        numOfKeywords = max_keywords
-        
-        # Создаем экстрактор YAKE
-        kw_extractor = yake.KeywordExtractor(
-            lan=language,
-            n=max_ngram_size,
-            dedupLim=deduplication_threshold,
-            top=numOfKeywords,
-            features=None
-        )
-        
-        # Извлекаем ключевые слова
-        keywords = kw_extractor.extract_keywords(all_text)
-        
-        # Возвращаем только текст ключевых слов (kw[0] - это текст, kw[1] - оценка)
-        return [str(kw[0]) for kw in keywords if len(kw) > 0 and isinstance(kw[0], str)]
+        kw_extractor = yake.KeywordExtractor(lan="en", n=max_ngram_size, dedupLim=0.7, top=top_per_doc, features=None)
+        docfreq: Dict[str, int] = {}
+        for doc in documents:
+            try:
+                kws = kw_extractor.extract_keywords(doc)
+                seen = set()
+                for kw, _score in kws:
+                    if not isinstance(kw, str):
+                        continue
+                    if kw in seen:
+                        continue
+                    seen.add(kw)
+                    docfreq[kw] = docfreq.get(kw, 0) + 1
+            except Exception:
+                continue
+        top_keywords = [kw for kw, _ in sorted(docfreq.items(), key=lambda x: x[1], reverse=True)[:50]]
+        return top_keywords, docfreq
     except Exception as e:
-        print(f"Error extracting YAKE keywords: {e}")
-        return []
+        print(f"Error extracting YAKE per doc: {e}")
+        return [], {}
 
 
-def extract_textrank_keywords(documents: List[str], max_keywords: int = 50) -> List[str]:
-    """Извлекает ключевые слова через TextRank"""
+def extract_textrank_keywords_per_doc(documents: List[str], top_per_doc: int = 15) -> Tuple[List[str], Dict[str, int]]:
+    """TextRank по документам с агрегацией по частоте появления в документах."""
     if not TEXTRANK_AVAILABLE:
-        return []
-    
+        return [], {}
     try:
-        # Объединяем все документы
-        all_text = ' '.join(documents)
-        
-        # Извлекаем ключевые слова через TextRank
-        extracted_keywords = keywords.keywords(all_text, words=max_keywords)
-        
-        # Разбиваем по запятым и очищаем
-        keyword_list = [kw.strip() for kw in extracted_keywords.split('\n') if kw.strip()]
-        
-        return keyword_list[:max_keywords]
+        docfreq: Dict[str, int] = {}
+        for doc in documents:
+            try:
+                extracted = keywords.keywords(doc, words=top_per_doc)
+                doc_kws = [kw.strip() for kw in extracted.split('\n') if kw.strip()]
+                seen = set()
+                for kw in doc_kws:
+                    if kw in seen:
+                        continue
+                    seen.add(kw)
+                    docfreq[kw] = docfreq.get(kw, 0) + 1
+            except Exception:
+                continue
+        top_keywords = [kw for kw, _ in sorted(docfreq.items(), key=lambda x: x[1], reverse=True)[:50]]
+        return top_keywords, docfreq
     except Exception as e:
-        print(f"Error extracting TextRank keywords: {e}")
-        return []
+        print(f"Error extracting TextRank per doc: {e}")
+        return [], {}
 
 
 def calculate_keyword_overlap(keywords1: List[str], keywords2: List[str]) -> Dict[str, float]:
@@ -220,8 +227,15 @@ def create_visualizations(results: Dict, output_dir: str):
     """Создает графики для результатов эксперимента"""
     
     # Настройка стиля
-    plt.style.use('seaborn-v0_8')
-    sns.set_palette("husl")
+    try:
+        plt.style.use('seaborn-v0_8')
+    except Exception:
+        plt.style.use('default')
+    if USE_SEABORN:
+        try:
+            sns.set_palette("husl")
+        except Exception:
+            pass
     
     # 1. График сравнения метрик по методам
     fig, axes = plt.subplots(2, 2, figsize=(15, 12))
@@ -297,15 +311,20 @@ def create_visualizations(results: Dict, output_dir: str):
         
         for i, method in enumerate(methods):
             if topic in results and method in results[topic]:
-                human_kw = results[topic][method]['human_keywords'][:10]
-                synthetic_kw = results[topic][method]['synthetic_keywords'][:10]
+                # Используем документные частоты для топов
+                human_df = results[topic][method].get('human_docfreq', {})
+                synthetic_df = results[topic][method].get('synthetic_docfreq', {})
+                # Определяем общую шкалу топ-ключевых по суммарной частоте
+                all_terms = set(human_df.keys()) | set(synthetic_df.keys())
+                ranked = sorted(all_terms, key=lambda t: human_df.get(t, 0) + synthetic_df.get(t, 0), reverse=True)
+                top_terms = ranked[:10]
+                if not top_terms:
+                    axes[i].set_visible(False)
+                    continue
+                human_counts = [human_df.get(t, 0) for t in top_terms]
+                synthetic_counts = [synthetic_df.get(t, 0) for t in top_terms]
                 
-                # Создаем данные для графика
-                all_kw = list(set(human_kw + synthetic_kw))
-                human_counts = [human_kw.count(kw) for kw in all_kw]
-                synthetic_counts = [synthetic_kw.count(kw) for kw in all_kw]
-                
-                x = np.arange(len(all_kw))
+                x = np.arange(len(top_terms))
                 width = 0.35
                 
                 ax = axes[i]
@@ -315,7 +334,7 @@ def create_visualizations(results: Dict, output_dir: str):
                 ax.set_title(f'{method.upper()}')
                 ax.set_ylabel('Частота')
                 ax.set_xticks(x)
-                ax.set_xticklabels(all_kw, rotation=45, ha='right')
+                ax.set_xticklabels(top_terms, rotation=45, ha='right')
                 ax.legend()
                 ax.grid(True, alpha=0.3)
         
@@ -561,19 +580,24 @@ def main():
         
         # Извлекаем ключевые слова разными методами
         methods = [
-            ('ngrams', extract_ngrams_keywords),
-            ('yake', extract_yake_keywords),
-            ('textrank', extract_textrank_keywords)
+            ('ngrams', None),
+            ('yake', None),
+            ('textrank', None)
         ]
         
-        for method_name, extract_func in methods:
+        for method_name, _ in methods:
             print(f"  Извлечение ключевых слов методом {method_name}...")
             
-            # Ключевые слова для человеческих текстов
-            human_keywords = extract_func(human_docs)
-            
-            # Ключевые слова для синтетических текстов
-            synthetic_keywords = extract_func(synthetic_docs)
+            # Ключевые слова и документные частоты
+            if method_name == 'ngrams':
+                human_keywords, human_df = extract_ngrams_keywords_per_doc(human_docs)
+                synthetic_keywords, synthetic_df = extract_ngrams_keywords_per_doc(synthetic_docs)
+            elif method_name == 'yake':
+                human_keywords, human_df = extract_yake_keywords_per_doc(human_docs)
+                synthetic_keywords, synthetic_df = extract_yake_keywords_per_doc(synthetic_docs)
+            else:  # textrank
+                human_keywords, human_df = extract_textrank_keywords_per_doc(human_docs)
+                synthetic_keywords, synthetic_df = extract_textrank_keywords_per_doc(synthetic_docs)
             
             # Вычисляем метрики пересечения
             overlap_metrics = calculate_keyword_overlap(human_keywords, synthetic_keywords)
@@ -587,7 +611,9 @@ def main():
                 'synthetic_keywords': synthetic_keywords,
                 'overlap_metrics': overlap_metrics,
                 'human_diversity': human_diversity,
-                'synthetic_diversity': synthetic_diversity
+                'synthetic_diversity': synthetic_diversity,
+                'human_docfreq': human_df,
+                'synthetic_docfreq': synthetic_df
             }
             
             print(f"    Найдено ключевых слов: человеческие {len(human_keywords)}, синтетические {len(synthetic_keywords)}")

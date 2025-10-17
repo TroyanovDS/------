@@ -19,26 +19,80 @@ from typing import List, Dict, Tuple
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
+try:
+    import seaborn as sns
+    USE_SEABORN = True
+except Exception:
+    USE_SEABORN = False
 from collections import Counter, defaultdict
-import nltk
-from nltk.tokenize import sent_tokenize, word_tokenize
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
+try:
+    import nltk
+    NLTK_AVAILABLE = True
+except Exception:
+    nltk = None
+    NLTK_AVAILABLE = False
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 # Добавляем путь к проекту
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-# Загружаем необходимые ресурсы NLTK
-try:
-    nltk.download('punkt', quiet=True)
-    nltk.download('stopwords', quiet=True)
-    nltk.download('wordnet', quiet=True)
-    nltk.download('vader_lexicon', quiet=True)
-except:
-    print("Warning: NLTK resources not available")
+if NLTK_AVAILABLE:
+    # Загружаем необходимые ресурсы NLTK
+    try:
+        nltk.download('punkt', quiet=True)
+        nltk.download('stopwords', quiet=True)
+        nltk.download('wordnet', quiet=True)
+        nltk.download('vader_lexicon', quiet=True)
+    except Exception:
+        print("Warning: NLTK resources not fully available")
+
+    # Пытаемся импортировать токенизаторы/словарь стоп-слов
+    try:
+        from nltk.tokenize import sent_tokenize as _nltk_sent_tokenize, word_tokenize as _nltk_word_tokenize
+    except Exception:
+        _nltk_sent_tokenize = None
+        _nltk_word_tokenize = None
+    try:
+        from nltk.corpus import stopwords as _nltk_stopwords
+    except Exception:
+        _nltk_stopwords = None
+else:
+    _nltk_sent_tokenize = None
+    _nltk_word_tokenize = None
+    _nltk_stopwords = None
+
+# Фолбэк токенизаторов/стоп-слов
+import re as _re_token
+
+def sent_tokenize(text: str):
+    if _nltk_sent_tokenize is not None:
+        try:
+            return _nltk_sent_tokenize(text)
+        except Exception:
+            pass
+    # Простой фолбэк по точкам
+    return [s.strip() for s in str(text).split('.') if s.strip()]
+
+def word_tokenize(text: str):
+    if _nltk_word_tokenize is not None:
+        try:
+            return _nltk_word_tokenize(text)
+        except Exception:
+            pass
+    return _re_token.findall(r"[A-Za-z']+", str(text))
+
+def get_stopwords() -> set:
+    if _nltk_stopwords is not None:
+        try:
+            return set(_nltk_stopwords.words('english'))
+        except Exception:
+            pass
+    return {
+        'the','a','an','and','or','but','in','on','at','to','for','of','with','by','is','are','was','were','be','been',
+        'have','has','had','do','does','did','will','would','could','should','may','might','must','can','this','that',
+        'these','those','i','you','he','she','it','we','they','me','him','her','us','them'
+    }
 
 try:
     from nltk.sentiment import SentimentIntensityAnalyzer
@@ -48,8 +102,15 @@ except ImportError:
     print("Warning: Sentiment analysis not available")
 
 # Настройка стиля графиков
-plt.style.use('seaborn-v0_8')
-sns.set_palette("husl")
+try:
+    plt.style.use('seaborn-v0_8')
+except Exception:
+    plt.style.use('default')
+if USE_SEABORN:
+    try:
+        sns.set_palette("husl")
+    except Exception:
+        pass
 
 
 def load_documents_from_csv(csv_path: str, count: int = 15) -> List[str]:
@@ -249,9 +310,36 @@ def analyze_repetitions(documents: List[str]) -> Dict[str, float]:
     }
 
 
-def analyze_sentiment(documents: List[str]) -> Dict[str, float]:
-    """Анализирует эмоциональную окраску текстов"""
-    if not SENTIMENT_AVAILABLE:
+def _fallback_sentiment(documents: List[str]) -> Dict[str, float]:
+    """Простой лексиконный fallback, если VADER недоступен."""
+    pos_words = {
+        'improve','improves','improved','significant','robust','effective','efficient','state-of-the-art',
+        'novel','promising','accurate','reliable','stable','strong','outperform','outperforms','advances','advance'
+    }
+    neg_words = {
+        'fail','fails','failure','error','errors','limitation','limitations','bias','noisy','weak','unstable',
+        'overfit','overfitting','underperform','underperforms','degrade','degradation'
+    }
+    import re as _re
+    tokens_all = []
+    scores = []
+    for doc in documents:
+        tokens = [t for t in _re.findall(r"[a-zA-Z']+", str(doc).lower())]
+        tokens_all.extend(tokens)
+        if not tokens:
+            scores.append({'pos':0.0,'neg':0.0,'neu':1.0,'compound':0.0})
+            continue
+        pos = sum(1 for t in tokens if t in pos_words)
+        neg = sum(1 for t in tokens if t in neg_words)
+        total = len(tokens)
+        comp = 0.0
+        if total > 0:
+            comp = (pos - neg) / max(1.0, (pos + neg + 10))  # сглаживание
+        neu = max(0.0, 1.0 - min(1.0, (pos+neg)/max(1.0,total)))
+        p = min(1.0, pos/max(1.0,total))
+        n = min(1.0, neg/max(1.0,total))
+        scores.append({'pos':p,'neg':n,'neu':neu,'compound':comp})
+    if not scores:
         return {
             'avg_positive': 0.0,
             'avg_negative': 0.0,
@@ -259,6 +347,23 @@ def analyze_sentiment(documents: List[str]) -> Dict[str, float]:
             'avg_compound': 0.0,
             'sentiment_distribution': {}
         }
+    return {
+        'avg_positive': float(np.mean([s['pos'] for s in scores])),
+        'avg_negative': float(np.mean([s['neg'] for s in scores])),
+        'avg_neutral': float(np.mean([s['neu'] for s in scores])),
+        'avg_compound': float(np.mean([s['compound'] for s in scores])),
+        'sentiment_distribution': {
+            'positive': sum(1 for s in scores if s['compound'] > 0.05),
+            'negative': sum(1 for s in scores if s['compound'] < -0.05),
+            'neutral': sum(1 for s in scores if -0.05 <= s['compound'] <= 0.05)
+        }
+    }
+
+
+def analyze_sentiment(documents: List[str]) -> Dict[str, float]:
+    """Анализирует эмоциональную окраску текстов"""
+    if not SENTIMENT_AVAILABLE:
+        return _fallback_sentiment(documents)
     
     try:
         analyzer = SentimentIntensityAnalyzer()
@@ -296,13 +401,7 @@ def analyze_sentiment(documents: List[str]) -> Dict[str, float]:
         
     except Exception as e:
         print(f"Error in sentiment analysis: {e}")
-        return {
-            'avg_positive': 0.0,
-            'avg_negative': 0.0,
-            'avg_neutral': 0.0,
-            'avg_compound': 0.0,
-            'sentiment_distribution': {}
-        }
+        return _fallback_sentiment(documents)
 
 
 def analyze_by_model(documents_by_model: Dict[str, List[str]]) -> Dict[str, Dict]:
@@ -436,8 +535,18 @@ def create_comprehensive_visualizations(results: Dict, output_dir: str):
         
         correlation_matrix = df_corr.corr()
         
-        sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', center=0, 
-                   square=True, ax=ax, cbar_kws={'shrink': 0.8})
+        if USE_SEABORN:
+            sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', center=0, 
+                        square=True, ax=ax, cbar_kws={'shrink': 0.8})
+        else:
+            cax = ax.imshow(correlation_matrix.values, cmap='coolwarm', vmin=-1, vmax=1)
+            ax.set_xticks(range(len(correlation_matrix.columns)))
+            ax.set_yticks(range(len(correlation_matrix.index)))
+            ax.set_xticklabels(correlation_matrix.columns, rotation=45, ha='right')
+            ax.set_yticklabels(correlation_matrix.index)
+            for (i, j), val in np.ndenumerate(correlation_matrix.values):
+                ax.text(j, i, f"{val:.2f}", ha='center', va='center', color='black', fontsize=8)
+            fig.colorbar(cax, ax=ax, shrink=0.8)
         ax.set_title('Корреляционная матрица метрик', fontsize=14, fontweight='bold')
         
         plt.tight_layout()
