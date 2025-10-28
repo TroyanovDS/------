@@ -44,6 +44,137 @@ CONNECTIVES = [
 ]
 
 
+# ------------------------
+# Utility tokenization/sentence splitters
+# ------------------------
+def split_sentences(text: str) -> list[str]:
+    # simple regex-based splitter
+    parts = re.split(r"(?<=[\.!?])\s+", text.strip())
+    return [p.strip() for p in parts if p.strip()]
+
+
+def tokenize_words(text: str) -> list[str]:
+    return re.findall(r"[A-Za-z']+", text.lower())
+
+
+# ------------------------
+# Lexica/Stylistics metrics
+# ------------------------
+def corpus_ttr(documents: list[str]) -> float:
+    tokens: list[str] = []
+    for doc in documents:
+        tokens.extend(tokenize_words(doc))
+    if not tokens:
+        return 0.0
+    return len(set(tokens)) / float(len(tokens))
+
+
+def corpus_zipf_fit(documents: list[str]) -> tuple[float, float]:
+    # Returns (slope, r2) for log(freq) ~ a + b*log(rank)
+    from collections import Counter
+    tokens: list[str] = []
+    for doc in documents:
+        tokens.extend(tokenize_words(doc))
+    if not tokens:
+        return 0.0, 0.0
+    cnt = Counter(tokens)
+    freqs = sorted(cnt.values(), reverse=True)
+    ranks = list(range(1, len(freqs) + 1))
+    import numpy as np
+    x = np.log(np.array(ranks, dtype=float))
+    y = np.log(np.array(freqs, dtype=float))
+    b, a = np.polyfit(x, y, 1)  # y ~ a + b x
+    y_pred = a + b * x
+    ss_res = float(np.sum((y - y_pred) ** 2))
+    ss_tot = float(np.sum((y - np.mean(y)) ** 2)) if len(y) > 1 else 0.0
+    r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
+    return float(b), float(r2)
+
+
+def corpus_self_bleu1(documents: list[str], sample_size: int = 50) -> float:
+    # Approximate Self-BLEU-1: average unigram precision of each doc vs union of others
+    from collections import Counter
+    if not documents:
+        return 0.0
+    docs = documents[:sample_size] if len(documents) > sample_size else documents
+    # build global reference counts for all docs first
+    precisions = []
+    for i, doc in enumerate(docs):
+        doc_tokens = tokenize_words(doc)
+        if not doc_tokens:
+            continue
+        # aggregate references from others
+        ref_counts = Counter()
+        for j, other in enumerate(docs):
+            if j == i:
+                continue
+            ref_counts.update(tokenize_words(other))
+        # clipped precision
+        doc_counts = Counter(doc_tokens)
+        match = 0
+        total = 0
+        for tok, c in doc_counts.items():
+            total += c
+            match += min(c, ref_counts.get(tok, 0))
+        if total > 0:
+            precisions.append(match / float(total))
+    return float(sum(precisions) / len(precisions)) if precisions else 0.0
+
+
+# ------------------------
+# Structure/Coherence metrics
+# ------------------------
+def corpus_burstiness(documents: list[str]) -> tuple[float, float]:
+    # Returns (mean sentence length, std sentence length)
+    import numpy as np
+    lengths = []
+    for doc in documents:
+        sents = split_sentences(doc)
+        if not sents:
+            continue
+        for s in sents:
+            lengths.append(len(tokenize_words(s)))
+    if not lengths:
+        return 0.0, 0.0
+    arr = np.array(lengths, dtype=float)
+    return float(arr.mean()), float(arr.std())
+
+
+def corpus_coherence_tfidf(documents: list[str]) -> float:
+    # Average adjacent sentence cosine similarity using TF-IDF
+    import numpy as np
+    sims: list[float] = []
+    for doc in documents:
+        sents = split_sentences(doc)
+        if len(sents) < 2:
+            continue
+        vec = TfidfVectorizer(stop_words='english', ngram_range=(1, 2), max_features=4000)
+        X = vec.fit_transform(sents)
+        for k in range(X.shape[0] - 1):
+            a = X[k]
+            b = X[k + 1]
+            num = a.multiply(b).sum()
+            denom = (a.multiply(a).sum() ** 0.5) * (b.multiply(b).sum() ** 0.5)
+            if denom > 0:
+                sims.append(float(num / denom))
+    return float(np.mean(sims)) if sims else 0.0
+
+
+# ------------------------
+# Technical heuristics
+# ------------------------
+def corpus_gzip_ratio(documents: list[str]) -> float:
+    import gzip
+    import io
+    data = ("\n\n".join(documents)).encode('utf-8', errors='ignore')
+    if not data:
+        return 0.0
+    buf = io.BytesIO()
+    with gzip.GzipFile(fileobj=buf, mode='wb', compresslevel=9) as f:
+        f.write(data)
+    comp = buf.getvalue()
+    return float(len(data) / max(1, len(comp)))
+
 def read_txts_from_dir(dir_path: str, limit: int | None = None) -> List[str]:
     docs: List[str] = []
     if not os.path.exists(dir_path):
@@ -271,6 +402,17 @@ def write_report(models: List[str], per_model_results: Dict[str, Dict], out_dir:
             f.write(f"![Пересечения]({model}_overlaps.png)\n\n")
             f.write(f"![Вводные и косинус]({model}_connectives_cosine.png)\n\n")
 
+            # Доп. метрики
+            extra = res.get('extra', {})
+            if extra:
+                f.write("**Дополнительные метрики (лексика/стилистика, структура, эвристики):**\n\n")
+                f.write(f"- TTR (HUMAN/AI): {extra.get('ttr_h',0):.3f} / {extra.get('ttr_s',0):.3f}\n")
+                f.write(f"- Zipf slope (H/A): {extra.get('zipf_slope_h',0):.3f} / {extra.get('zipf_slope_s',0):.3f}, R2 (H/A): {extra.get('zipf_r2_h',0):.3f} / {extra.get('zipf_r2_s',0):.3f}\n")
+                f.write(f"- Self-BLEU1 (H/A): {extra.get('self_bleu_h',0):.3f} / {extra.get('self_bleu_s',0):.3f}\n")
+                f.write(f"- Coherence TF-IDF (H/A): {extra.get('coh_h',0):.3f} / {extra.get('coh_s',0):.3f}\n")
+                f.write(f"- Sentence length mean±std (H): {extra.get('sent_mean_h',0):.2f}±{extra.get('sent_std_h',0):.2f}; (A): {extra.get('sent_mean_s',0):.2f}±{extra.get('sent_std_s',0):.2f}\n")
+                f.write(f"- Gzip ratio (H/A): {extra.get('gzip_h',0):.2f} / {extra.get('gzip_s',0):.2f}\n\n")
+
         # Интерпретация и применимость
         f.write("## Как использовать результаты для детекции AI-текстов\n\n")
         f.write("- Низкие значения Jaccard/Harmonic указывают на различия в лексике и ключевых фразах между HUMAN и AI; это сигнал для детекции.\n")
@@ -325,6 +467,20 @@ def main():
         conn_s = compute_connectives_rate(synth_docs)
         cos_sim = cosine_similarity_corpora(human_docs, synth_docs)
 
+        # Extra metrics
+        ttr_h = corpus_ttr(human_docs)
+        ttr_s = corpus_ttr(synth_docs)
+        slope_h, r2_h = corpus_zipf_fit(human_docs)
+        slope_s, r2_s = corpus_zipf_fit(synth_docs)
+        sb_h = corpus_self_bleu1(human_docs, sample_size=50)
+        sb_s = corpus_self_bleu1(synth_docs, sample_size=50)
+        coh_h = corpus_coherence_tfidf(human_docs)
+        coh_s = corpus_coherence_tfidf(synth_docs)
+        smean_h, sstd_h = corpus_burstiness(human_docs)
+        smean_s, sstd_s = corpus_burstiness(synth_docs)
+        gz_h = corpus_gzip_ratio(human_docs)
+        gz_s = corpus_gzip_ratio(synth_docs)
+
         plot_metrics_for_model(model, methods_results, conn_h, conn_s, cos_sim, args.output_dir)
 
         per_model_results[model] = {
@@ -332,6 +488,16 @@ def main():
             'connectives_h': conn_h,
             'connectives_s': conn_s,
             'cosine_similarity': cos_sim,
+            'extra': {
+                'ttr_h': ttr_h, 'ttr_s': ttr_s,
+                'zipf_slope_h': slope_h, 'zipf_r2_h': r2_h,
+                'zipf_slope_s': slope_s, 'zipf_r2_s': r2_s,
+                'self_bleu_h': sb_h, 'self_bleu_s': sb_s,
+                'coh_h': coh_h, 'coh_s': coh_s,
+                'sent_mean_h': smean_h, 'sent_std_h': sstd_h,
+                'sent_mean_s': smean_s, 'sent_std_s': sstd_s,
+                'gzip_h': gz_h, 'gzip_s': gz_s,
+            }
         }
 
     write_report(list(per_model_results.keys()), per_model_results, args.output_dir)
