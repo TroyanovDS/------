@@ -10,14 +10,14 @@ from arxiv_collector import ArXivCollector
 import os
 
 CATEGORIES = {
-    "text_mining": "all:machine learning",
-	"information_retrieval": "all:information retrieval"
+    "text_mining": "ti:\"text mining\" OR abs:\"text mining\" OR cat:cs.CL",
+    "information_retrieval": "ti:\"information retrieval\" OR abs:\"information retrieval\" OR cat:cs.IR",
 }
 
 
-def collect_arxiv():
+def collect_arxiv(count_per_topic: int = 50):
     """Функция для сбора, сохранения исходных данных и перевода"""
-    collector = ArXivCollector(max_results=20)
+    collector = ArXivCollector(max_results=count_per_topic)
 
 
     # Создаем папки заранее
@@ -36,5 +36,8 @@ def collect_arxiv():
 
 
 if __name__ == "__main__":
-    collect_arxiv()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--count", type=int, default=50)
+    args = parser.parse_args()
+    collect_arxiv(args.count)
 

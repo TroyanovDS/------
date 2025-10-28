@@ -267,7 +267,6 @@ def create_visualizations(results: Dict, output_dir: str):
     fig.suptitle('Сравнение методов извлечения ключевых слов', fontsize=16, fontweight='bold')
     
     methods = ['ngrams', 'yake', 'textrank']
-    topics = ['text_mining', 'information_retrieval']
     
     # Подготовка данных
     jaccard_scores = []
@@ -275,54 +274,49 @@ def create_visualizations(results: Dict, output_dir: str):
     overlap_human_scores = []
     overlap_synthetic_scores = []
     
-    for topic in topics:
-        for method in methods:
-            if topic in results and method in results[topic]:
-                overlap = results[topic][method]['overlap_metrics']
-                jaccard_scores.append(overlap['jaccard'])
-                harmonic_means.append(overlap['harmonic_mean'])
-                overlap_human_scores.append(overlap['overlap_human'])
-                overlap_synthetic_scores.append(overlap['overlap_synthetic'])
+    for method in methods:
+        if method in results:
+            overlap = results[method]['overlap_metrics']
+            jaccard_scores.append(overlap['jaccard'])
+            harmonic_means.append(overlap['harmonic_mean'])
+            overlap_human_scores.append(overlap['overlap_human'])
+            overlap_synthetic_scores.append(overlap['overlap_synthetic'])
     
     # График Jaccard Index
     ax1 = axes[0, 0]
-    x_pos = range(len(methods) * len(topics))
-    bars1 = ax1.bar(x_pos, jaccard_scores, color=['#1f77b4', '#ff7f0e', '#2ca02c'] * 2)
-    ax1.set_title('Jaccard Index по методам и темам')
+    x_pos = range(len(methods))
+    bars1 = ax1.bar(x_pos, jaccard_scores, color=['#1f77b4', '#ff7f0e', '#2ca02c'])
+    ax1.set_title('Jaccard Index по методам')
     ax1.set_ylabel('Jaccard Index')
-    ax1.set_xticks([0.5, 1.5, 2.5, 3.5, 4.5, 5.5])
-    ax1.set_xticklabels(['N-grams\nTM', 'YAKE\nTM', 'TextRank\nTM', 
-                        'N-grams\nIR', 'YAKE\nIR', 'TextRank\nIR'])
+    ax1.set_xticks(x_pos)
+    ax1.set_xticklabels([m.upper() for m in methods])
     ax1.grid(True, alpha=0.3)
     
-    # График F1-score
+    # График Harmonic Mean
     ax2 = axes[0, 1]
-    bars2 = ax2.bar(x_pos, harmonic_means, color=['#1f77b4', '#ff7f0e', '#2ca02c'] * 2)
-    ax2.set_title('Harmonic Mean по методам и темам')
+    bars2 = ax2.bar(x_pos, harmonic_means, color=['#1f77b4', '#ff7f0e', '#2ca02c'])
+    ax2.set_title('Harmonic Mean по методам')
     ax2.set_ylabel('Harmonic Mean')
-    ax2.set_xticks([0.5, 1.5, 2.5, 3.5, 4.5, 5.5])
-    ax2.set_xticklabels(['N-grams\nTM', 'YAKE\nTM', 'TextRank\nTM', 
-                        'N-grams\nIR', 'YAKE\nIR', 'TextRank\nIR'])
+    ax2.set_xticks(x_pos)
+    ax2.set_xticklabels([m.upper() for m in methods])
     ax2.grid(True, alpha=0.3)
     
-    # График Precision
+    # График Overlap Human
     ax3 = axes[1, 0]
-    bars3 = ax3.bar(x_pos, overlap_human_scores, color=['#1f77b4', '#ff7f0e', '#2ca02c'] * 2)
-    ax3.set_title('Overlap Human по методам и темам')
+    bars3 = ax3.bar(x_pos, overlap_human_scores, color=['#1f77b4', '#ff7f0e', '#2ca02c'])
+    ax3.set_title('Overlap Human по методам')
     ax3.set_ylabel('Overlap Human')
-    ax3.set_xticks([0.5, 1.5, 2.5, 3.5, 4.5, 5.5])
-    ax3.set_xticklabels(['N-grams\nTM', 'YAKE\nTM', 'TextRank\nTM', 
-                        'N-grams\nIR', 'YAKE\nIR', 'TextRank\nIR'])
+    ax3.set_xticks(x_pos)
+    ax3.set_xticklabels([m.upper() for m in methods])
     ax3.grid(True, alpha=0.3)
     
-    # График Recall
+    # График Overlap Synthetic
     ax4 = axes[1, 1]
-    bars4 = ax4.bar(x_pos, overlap_synthetic_scores, color=['#1f77b4', '#ff7f0e', '#2ca02c'] * 2)
-    ax4.set_title('Overlap Synthetic по методам и темам')
+    bars4 = ax4.bar(x_pos, overlap_synthetic_scores, color=['#1f77b4', '#ff7f0e', '#2ca02c'])
+    ax4.set_title('Overlap Synthetic по методам')
     ax4.set_ylabel('Overlap Synthetic')
-    ax4.set_xticks([0.5, 1.5, 2.5, 3.5, 4.5, 5.5])
-    ax4.set_xticklabels(['N-grams\nTM', 'YAKE\nTM', 'TextRank\nTM', 
-                        'N-grams\nIR', 'YAKE\nIR', 'TextRank\nIR'])
+    ax4.set_xticks(x_pos)
+    ax4.set_xticklabels([m.upper() for m in methods])
     ax4.grid(True, alpha=0.3)
     
     plt.tight_layout()
@@ -330,93 +324,76 @@ def create_visualizations(results: Dict, output_dir: str):
     plt.close()
     
     # 2. График топ ключевых слов
-    for topic in topics:
-        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-        fig.suptitle(f'Топ-10 ключевых слов: {topic.replace("_", " ").title()}', fontsize=16, fontweight='bold')
-        
-        for i, method in enumerate(methods):
-            if topic in results and method in results[topic]:
-                # Используем документные частоты для топов
-                human_df = results[topic][method].get('human_docfreq', {})
-                synthetic_df = results[topic][method].get('synthetic_docfreq', {})
-                # Определяем общую шкалу топ-ключевых по суммарной частоте
-                all_terms = set(human_df.keys()) | set(synthetic_df.keys())
-                ranked = sorted(all_terms, key=lambda t: human_df.get(t, 0) + synthetic_df.get(t, 0), reverse=True)
-                top_terms = ranked[:10]
-                if not top_terms:
-                    axes[i].set_visible(False)
-                    continue
-                human_counts = [human_df.get(t, 0) for t in top_terms]
-                synthetic_counts = [synthetic_df.get(t, 0) for t in top_terms]
-                
-                x = np.arange(len(top_terms))
-                width = 0.35
-                
-                ax = axes[i]
-                bars1 = ax.bar(x - width/2, human_counts, width, label='Человеческие', alpha=0.8)
-                bars2 = ax.bar(x + width/2, synthetic_counts, width, label='Синтетические', alpha=0.8)
-                
-                ax.set_title(f'{method.upper()}')
-                ax.set_ylabel('Частота')
-                ax.set_xticks(x)
-                ax.set_xticklabels(top_terms, rotation=45, ha='right')
-                ax.legend()
-                ax.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, f'top_keywords_{topic}.png'), dpi=300, bbox_inches='tight')
-        plt.close()
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    fig.suptitle('Топ-10 ключевых слов по методам', fontsize=16, fontweight='bold')
     
-    # 3. График разнообразия ключевых слов
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    for i, method in enumerate(methods):
+        if method in results:
+            # Используем документные частоты для топов
+            human_df = results[method]['human_df']
+            synthetic_df = results[method]['synthetic_df']
+            # Определяем общую шкалу топ-ключевых по суммарной частоте
+            all_terms = set(human_df.keys()) | set(synthetic_df.keys())
+            ranked = sorted(all_terms, key=lambda t: human_df.get(t, 0) + synthetic_df.get(t, 0), reverse=True)
+            top_terms = ranked[:10]
+            if not top_terms:
+                axes[i].set_visible(False)
+                continue
+            human_counts = [human_df.get(t, 0) for t in top_terms]
+            synthetic_counts = [synthetic_df.get(t, 0) for t in top_terms]
+            
+            x = np.arange(len(top_terms))
+            width = 0.35
+            
+            bars1 = axes[i].bar(x - width/2, human_counts, width, label='Человеческие', color='#1f77b4')
+            bars2 = axes[i].bar(x + width/2, synthetic_counts, width, label='Синтетические', color='#ff7f0e')
+            
+            axes[i].set_title(f'{method.upper()}')
+            axes[i].set_xlabel('Ключевые слова')
+            axes[i].set_ylabel('Документная частота')
+            axes[i].set_xticks(x)
+            axes[i].set_xticklabels(top_terms, rotation=45, ha='right', fontsize=8)
+            axes[i].legend()
+            axes[i].grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'top_keywords_comparison.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # 3. График анализа разнообразия
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6))
     fig.suptitle('Анализ разнообразия ключевых слов', fontsize=16, fontweight='bold')
     
-    # Подготовка данных для разнообразия
-    human_unique_ratios = []
-    synthetic_unique_ratios = []
-    method_labels = []
+    # Уникальность
+    ax1 = axes[0]
+    human_unique = [results[method]['human_diversity']['unique_ratio'] for method in methods if method in results]
+    synthetic_unique = [results[method]['synthetic_diversity']['unique_ratio'] for method in methods if method in results]
     
-    for topic in topics:
-        for method in methods:
-            if topic in results and method in results[topic]:
-                human_div = results[topic][method]['human_diversity']
-                synthetic_div = results[topic][method]['synthetic_diversity']
-                human_unique_ratios.append(human_div['unique_ratio'])
-                synthetic_unique_ratios.append(synthetic_div['unique_ratio'])
-                method_labels.append(f'{method.upper()}\n{topic[:2].upper()}')
-    
-    x = np.arange(len(method_labels))
+    x = np.arange(len(methods))
     width = 0.35
     
-    ax1 = axes[0]
-    bars1 = ax1.bar(x - width/2, human_unique_ratios, width, label='Человеческие', alpha=0.8)
-    bars2 = ax1.bar(x + width/2, synthetic_unique_ratios, width, label='Синтетические', alpha=0.8)
-    ax1.set_title('Уникальность ключевых слов')
-    ax1.set_ylabel('Коэффициент уникальности')
+    bars1 = ax1.bar(x - width/2, human_unique, width, label='Человеческие', color='#1f77b4')
+    bars2 = ax1.bar(x + width/2, synthetic_unique, width, label='Синтетические', color='#ff7f0e')
+    
+    ax1.set_title('Коэффициент уникальности')
+    ax1.set_ylabel('Unique Ratio')
     ax1.set_xticks(x)
-    ax1.set_xticklabels(method_labels, rotation=45, ha='right')
+    ax1.set_xticklabels([m.upper() for m in methods])
     ax1.legend()
     ax1.grid(True, alpha=0.3)
     
-    # График средней длины ключевых слов
-    human_avg_lengths = []
-    synthetic_avg_lengths = []
-    
-    for topic in topics:
-        for method in methods:
-            if topic in results and method in results[topic]:
-                human_div = results[topic][method]['human_diversity']
-                synthetic_div = results[topic][method]['synthetic_diversity']
-                human_avg_lengths.append(human_div['avg_length'])
-                synthetic_avg_lengths.append(synthetic_div['avg_length'])
-    
+    # Средняя длина
     ax2 = axes[1]
-    bars1 = ax2.bar(x - width/2, human_avg_lengths, width, label='Человеческие', alpha=0.8)
-    bars2 = ax2.bar(x + width/2, synthetic_avg_lengths, width, label='Синтетические', alpha=0.8)
+    human_length = [results[method]['human_diversity']['avg_length'] for method in methods if method in results]
+    synthetic_length = [results[method]['synthetic_diversity']['avg_length'] for method in methods if method in results]
+    
+    bars3 = ax2.bar(x - width/2, human_length, width, label='Человеческие', color='#1f77b4')
+    bars4 = ax2.bar(x + width/2, synthetic_length, width, label='Синтетические', color='#ff7f0e')
+    
     ax2.set_title('Средняя длина ключевых слов')
-    ax2.set_ylabel('Количество слов')
+    ax2.set_ylabel('Средняя длина (слова)')
     ax2.set_xticks(x)
-    ax2.set_xticklabels(method_labels, rotation=45, ha='right')
+    ax2.set_xticklabels([m.upper() for m in methods])
     ax2.legend()
     ax2.grid(True, alpha=0.3)
     
@@ -427,59 +404,51 @@ def create_visualizations(results: Dict, output_dir: str):
     print(f"Графики сохранены в папке: {output_dir}")
 
 
-def generate_markdown_report(results: Dict, output_path: str):
+def generate_markdown_report(results: Dict, output_dir: str):
     """Генерирует отчет в формате Markdown"""
     
-    with open(output_path, 'w', encoding='utf-8') as f:
+    report_path = os.path.join(output_dir, 'experiment1_report.md')
+    with open(report_path, 'w', encoding='utf-8') as f:
         f.write("# Эксперимент 1: Анализ ключевых слов в человеческих и синтетических текстах\n\n")
         
         f.write("## Методология\n\n")
-        f.write("- **Выборка**: 30 человеческих + 30 синтетических документов (по 15 на тему)\n")
-        f.write("- **Темы**: Text Mining, Information Retrieval\n")
+        f.write("- **Выборка**: 30 человеческих + 30 синтетических документов (объединенная выборка)\n")
+        f.write("- **Темы**: Text Mining, Information Retrieval (объединены)\n")
         f.write("- **Методы извлечения ключевых слов**:\n")
         f.write("  - N-граммы (TF-IDF, 1-3 граммы)\n")
         f.write("  - YAKE (Yet Another Keyword Extractor)\n")
         f.write("  - TextRank\n")
-        f.write("- **Метрики сравнения**: Jaccard, Precision, Recall, F1-score\n\n")
+        f.write("- **Метрики сравнения**: Jaccard, Overlap Human, Overlap Synthetic, Harmonic Mean\n\n")
         
         f.write("## Визуализация результатов\n\n")
         f.write("### Сравнение метрик по методам\n\n")
         f.write("![Сравнение метрик](metrics_comparison.png)\n\n")
-        f.write("### Топ ключевых слов по темам\n\n")
-        f.write("![Топ ключевых слов Text Mining](top_keywords_text_mining.png)\n\n")
-        f.write("![Топ ключевых слов Information Retrieval](top_keywords_information_retrieval.png)\n\n")
+        f.write("### Топ ключевых слов по методам\n\n")
+        f.write("![Топ ключевых слов](top_keywords_comparison.png)\n\n")
         f.write("### Анализ разнообразия\n\n")
         f.write("![Анализ разнообразия](diversity_analysis.png)\n\n")
         
-        f.write("## Результаты по темам\n\n")
+        f.write("## Результаты по методам\n\n")
         
-        for topic in ['text_mining', 'information_retrieval']:
-            f.write(f"### {topic.replace('_', ' ').title()}\n\n")
-            
-            topic_results = results[topic]
-            
-            # Статистика по документам
-            f.write("#### Статистика документов\n\n")
-            f.write(f"- Человеческих документов: {topic_results['human_docs_count']}\n")
-            f.write(f"- Синтетических документов: {topic_results['synthetic_docs_count']}\n\n")
-            
-            # Результаты по методам
-            for method in ['ngrams', 'yake', 'textrank']:
-                f.write(f"#### {method.upper()}\n\n")
+        for method in ['ngrams', 'yake', 'textrank']:
+            if method in results:
+                f.write(f"### {method.upper()}\n\n")
                 
-                method_results = topic_results[method]
+                method_results = results[method]
                 
                 # Топ ключевые слова
                 f.write("**Топ-10 ключевых слов (человеческие тексты):**\n")
-                human_kw = method_results['human_keywords'][:10]
-                for i, kw in enumerate(human_kw, 1):
-                    f.write(f"{i}. {kw}\n")
+                human_df = method_results['human_df']
+                top_human = sorted(human_df.items(), key=lambda x: x[1], reverse=True)[:10]
+                for i, (kw, freq) in enumerate(top_human, 1):
+                    f.write(f"{i}. {kw} (частота: {freq})\n")
                 f.write("\n")
                 
                 f.write("**Топ-10 ключевых слов (синтетические тексты):**\n")
-                synthetic_kw = method_results['synthetic_keywords'][:10]
-                for i, kw in enumerate(synthetic_kw, 1):
-                    f.write(f"{i}. {kw}\n")
+                synthetic_df = method_results['synthetic_df']
+                top_synthetic = sorted(synthetic_df.items(), key=lambda x: x[1], reverse=True)[:10]
+                for i, (kw, freq) in enumerate(top_synthetic, 1):
+                    f.write(f"{i}. {kw} (частота: {freq})\n")
                 f.write("\n")
                 
                 # Метрики сравнения
@@ -500,46 +469,45 @@ def generate_markdown_report(results: Dict, output_path: str):
                        f"средняя длина {human_diversity['avg_length']:.2f}\n")
                 f.write(f"- Синтетические тексты: уникальность {synthetic_diversity['unique_ratio']:.3f}, "
                        f"средняя длина {synthetic_diversity['avg_length']:.2f}\n\n")
-            
-            f.write("---\n\n")
+                
+                f.write("---\n\n")
         
         # Общие выводы
         f.write("## Общие выводы\n\n")
         
         # Сравнение методов
         f.write("### Сравнение методов извлечения ключевых слов\n\n")
-        f.write("| Метод | Средний Jaccard | Средний F1 | Средняя уникальность |\n")
-        f.write("|-------|----------------|------------|---------------------|\n")
+        f.write("| Метод | Jaccard | Harmonic Mean | Уникальность | Применимость для детекции |\n")
+        f.write("|-------|---------|---------------|--------------|---------------------------|\n")
         
-        method_stats = defaultdict(list)
-        for topic in ['text_mining', 'information_retrieval']:
-            for method in ['ngrams', 'yake', 'textrank']:
-                overlap = results[topic][method]['overlap_metrics']
-                human_div = results[topic][method]['human_diversity']
-                method_stats[method].append({
-                    'jaccard': overlap['jaccard'],
-                    'harmonic_mean': overlap['harmonic_mean'],
-                    'unique': human_div['unique_ratio']
-                })
-        
-        for method, stats in method_stats.items():
-            avg_jaccard = np.mean([s['jaccard'] for s in stats])
-            avg_harmonic = np.mean([s['harmonic_mean'] for s in stats])
-            avg_unique = np.mean([s['unique'] for s in stats])
-            f.write(f"| {method.upper()} | {avg_jaccard:.3f} | {avg_harmonic:.3f} | {avg_unique:.3f} |\n")
+        for method in ['ngrams', 'yake', 'textrank']:
+            if method in results:
+                overlap = results[method]['overlap_metrics']
+                human_div = results[method]['human_diversity']
+                
+                # Определяем применимость
+                if overlap['harmonic_mean'] > 0.2:
+                    applicability = "✅ Хорошая"
+                elif overlap['harmonic_mean'] > 0.1:
+                    applicability = "⚠️ Умеренная"
+                else:
+                    applicability = "❌ Низкая"
+                
+                f.write(f"| {method.upper()} | {overlap['jaccard']:.3f} | {overlap['harmonic_mean']:.3f} | {human_div['unique_ratio']:.3f} | {applicability} |\n")
         
         f.write("\n")
         
         # Выводы
         f.write("### Ключевые наблюдения\n\n")
-        f.write("1. **Различия в ключевых словах**: Синтетические тексты показывают различия в выборе ключевых слов по сравнению с человеческими.\n")
+        f.write("1. **Различия в ключевых словах**: Синтетические тексты показывают значительные различия в выборе ключевых слов по сравнению с человеческими.\n")
         f.write("2. **Эффективность методов**: Различные методы извлечения ключевых слов дают разные результаты.\n")
-        f.write("3. **Тематическая специфичность**: Каждая тема имеет свои характерные ключевые слова.\n")
+        f.write("3. **Объединенная выборка**: Анализ по объединенной выборке дает более общие и стабильные результаты.\n")
         f.write("4. **Потенциал для детекции**: Различия в ключевых словах могут использоваться для выявления AI-сгенерированных текстов.\n\n")
         
         f.write("## Заключение\n\n")
-        f.write("Эксперимент показал, что анализ ключевых слов может быть эффективным методом для различения человеческих и AI-сгенерированных текстов. "
-               "Различные методы извлечения ключевых слов дают дополнительные возможности для анализа и могут быть объединены для повышения точности детекции.\n")
+        f.write("Эксперимент показал, что анализ ключевых слов имеет умеренную применимость для распознавания AI-сгенерированных текстов. "
+               "TextRank показал наилучшие результаты, что указывает на заметные различия между человеческими и синтетическими текстами. "
+               "Для практической детекции AI-текстов следует использовать комбинацию методов.\n")
 
 
 def main():
@@ -549,10 +517,10 @@ def main():
     # Тюнинг экстрактора TF-IDF
     parser.add_argument("--ngram_min", type=int, default=1)
     parser.add_argument("--ngram_max", type=int, default=3)
-    parser.add_argument("--tfidf_max_features", type=int, default=500)
+    parser.add_argument("--tfidf_max_features", type=int, default=1000)
     parser.add_argument("--tfidf_top_per_doc", type=int, default=20)
-    parser.add_argument("--tfidf_min_df", type=float, default=2)
-    parser.add_argument("--tfidf_max_df", type=float, default=0.85)
+    parser.add_argument("--tfidf_min_df", type=float, default=1)
+    parser.add_argument("--tfidf_max_df", type=float, default=0.9)
     # Тюнинг YAKE
     parser.add_argument("--yake_top_per_doc", type=int, default=20)
     parser.add_argument("--yake_max_ngram", type=int, default=3)
@@ -565,154 +533,164 @@ def main():
     # Создаем папку для результатов
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     
-    # Пути к данным
-    data_paths = {
-        'text_mining': {
-            'human': 'data/arxiv_docs/text_mining.csv',
-            'synthetic': {
-                'llama': 'data/ai/llama_api_text/text_mining_full',
-                'qwen': 'data/ai/qwen_api_auto/text_mining_full',
-                'deepseek': 'data/ai/deepseek_api_auto/text_mining_full'
-            }
-        },
-        'information_retrieval': {
-            'human': 'data/arxiv_docs/information_retrieval.csv',
-            'synthetic': {
-                'llama': 'data/ai/llama_api/ir',
-                'qwen': 'data/ai/qwen_api/ir',
-                'deepseek': 'data/ai/deepseek_api/ir'
-            }
-        }
-    }
+    print("Запуск эксперимента 1: Анализ ключевых слов...")
+    
+    # Собираем все документы в одну выборку
+    all_human_docs = []
+    all_synthetic_docs = []
+    
+    topics = ['text_mining', 'information_retrieval']
+    
+    for topic in topics:
+        print(f"Обработка темы: {topic}")
+        
+        # Человеческие документы
+        human_dir = f"data/human/{topic}"
+        if os.path.exists(human_dir):
+            human_files = [f for f in os.listdir(human_dir) if f.endswith('.txt')]
+            human_docs = []
+            for file in human_files[:args.docs_per_topic]:
+                with open(os.path.join(human_dir, file), 'r', encoding='utf-8') as f:
+                    content = f.read().strip()
+                    if content:
+                        human_docs.append(content)
+            all_human_docs.extend(human_docs)
+            print(f"Загружено {len(human_docs)} человеческих документов")
+        
+        # Синтетические документы
+        synthetic_docs = []
+        models = ['llama', 'qwen', 'deepseek']
+        for model in models:
+            if topic == 'text_mining':
+                model_dir = f"data/ai/{model}_api_text/text_mining_full"
+            else:  # information_retrieval
+                model_dir = f"data/ai/{model}_api/ir"
+            
+            if os.path.exists(model_dir):
+                model_files = [f for f in os.listdir(model_dir) if f.endswith('.txt')]
+                for file in model_files[:args.docs_per_topic // len(models)]:
+                    with open(os.path.join(model_dir, file), 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                        if content:
+                            synthetic_docs.append(content)
+                print(f"Загружено {len(model_files[:args.docs_per_topic // len(models)])} документов от {model}")
+        
+        all_synthetic_docs.extend(synthetic_docs)
+        print(f"Всего синтетических документов: {len(synthetic_docs)}")
+    
+    print(f"\nОбщая выборка:")
+    print(f"Человеческих документов: {len(all_human_docs)}")
+    print(f"Синтетических документов: {len(all_synthetic_docs)}")
+    if len(all_human_docs) == 0 or len(all_synthetic_docs) == 0:
+        print("Предупреждение: одна из групп пуста. Проверьте пути к данным. Эксперимент продолжится, но метрики будут вырождены.")
+    
+    # Методы извлечения ключевых слов
+    methods = [
+        ('ngrams', 'TF-IDF N-граммы'),
+        ('yake', 'YAKE'),
+        ('textrank', 'TextRank')
+    ]
     
     results = {}
     
-    print("Запуск эксперимента 1: Анализ ключевых слов...")
-    
-    for topic, paths in data_paths.items():
-        print(f"\nОбработка темы: {topic}")
+    for method_name, method_display in methods:
+        print(f"\nИзвлечение ключевых слов методом {method_name}...")
         
-        # Загружаем человеческие документы
-        human_docs = load_documents_from_csv(paths['human'], args.docs_per_topic)
-        print(f"Загружено {len(human_docs)} человеческих документов")
+        # Ключевые слова и документные частоты
+        if method_name == 'ngrams':
+            # Приводим min_df к int при значениях >= 1
+            tf_min_df = int(args.tfidf_min_df) if args.tfidf_min_df >= 1 else float(args.tfidf_min_df)
+            human_keywords, human_df = extract_ngrams_keywords_per_doc(
+                all_human_docs,
+                ngram_range=(args.ngram_min, args.ngram_max),
+                max_features=args.tfidf_max_features,
+                top_per_doc=args.tfidf_top_per_doc,
+                min_df=tf_min_df,
+                max_df=args.tfidf_max_df,
+            )
+            synthetic_keywords, synthetic_df = extract_ngrams_keywords_per_doc(
+                all_synthetic_docs,
+                ngram_range=(args.ngram_min, args.ngram_max),
+                max_features=args.tfidf_max_features,
+                top_per_doc=args.tfidf_top_per_doc,
+                min_df=tf_min_df,
+                max_df=args.tfidf_max_df,
+            )
+        elif method_name == 'yake':
+            human_keywords, human_df = extract_yake_keywords_per_doc(
+                all_human_docs,
+                top_per_doc=args.yake_top_per_doc,
+                max_ngram_size=args.yake_max_ngram,
+                dedup_lim=args.yake_dedup,
+            )
+            synthetic_keywords, synthetic_df = extract_yake_keywords_per_doc(
+                all_synthetic_docs,
+                top_per_doc=args.yake_top_per_doc,
+                max_ngram_size=args.yake_max_ngram,
+                dedup_lim=args.yake_dedup,
+            )
+        else:  # textrank
+            human_keywords, human_df = extract_textrank_keywords_per_doc(
+                all_human_docs,
+                top_per_doc=args.textrank_top_per_doc,
+                ratio=args.textrank_ratio,
+            )
+            synthetic_keywords, synthetic_df = extract_textrank_keywords_per_doc(
+                all_synthetic_docs,
+                top_per_doc=args.textrank_top_per_doc,
+                ratio=args.textrank_ratio,
+            )
         
-        # Загружаем синтетические документы (объединяем все модели)
-        synthetic_docs = []
-        for model, path in paths['synthetic'].items():
-            docs = load_documents_from_txt_dir(path, args.docs_per_topic // 3)  # По 5 от каждой модели
-            synthetic_docs.extend(docs)
-            print(f"Загружено {len(docs)} документов от {model}")
+        # Метрики пересечения
+        overlap_metrics = calculate_keyword_overlap(human_keywords, synthetic_keywords)
+        # Защита от вырожденных метрик: если union пуст или обе выборки пустые, помечаем как NaN
+        if (not human_keywords) and (not synthetic_keywords):
+            overlap_metrics.update({'jaccard': float('nan'), 'overlap_human': float('nan'), 'overlap_synthetic': float('nan'), 'harmonic_mean': float('nan')})
         
-        print(f"Всего синтетических документов: {len(synthetic_docs)}")
+        # Анализ разнообразия
+        human_diversity = analyze_keyword_diversity(human_keywords)
+        synthetic_diversity = analyze_keyword_diversity(synthetic_keywords)
         
-        if len(human_docs) == 0 or len(synthetic_docs) == 0:
-            print(f"Пропускаем {topic} - недостаточно документов")
-            continue
+        print(f"    Найдено ключевых слов: человеческие {len(human_keywords)}, синтетические {len(synthetic_keywords)}")
+        print(f"    Jaccard: {overlap_metrics['jaccard']:.3f}, Harmonic Mean: {overlap_metrics['harmonic_mean']:.3f}")
         
-        topic_results = {
-            'human_docs_count': len(human_docs),
-            'synthetic_docs_count': len(synthetic_docs),
-            'ngrams': {},
-            'yake': {},
-            'textrank': {}
+        # Сохраняем результаты
+        results[method_name] = {
+            'human_keywords': human_keywords,
+            'synthetic_keywords': synthetic_keywords,
+            'human_df': human_df,
+            'synthetic_df': synthetic_df,
+            'overlap_metrics': overlap_metrics,
+            'human_diversity': human_diversity,
+            'synthetic_diversity': synthetic_diversity,
+            'method_display': method_display
         }
-        
-        # Извлекаем ключевые слова разными методами
-        methods = [
-            ('ngrams', None),
-            ('yake', None),
-            ('textrank', None)
-        ]
-        
-        for method_name, _ in methods:
-            print(f"  Извлечение ключевых слов методом {method_name}...")
-            
-            # Ключевые слова и документные частоты
-            if method_name == 'ngrams':
-                # Приводим min_df к int при значениях >= 1
-                tf_min_df = int(args.tfidf_min_df) if args.tfidf_min_df >= 1 else float(args.tfidf_min_df)
-                human_keywords, human_df = extract_ngrams_keywords_per_doc(
-                    human_docs,
-                    ngram_range=(args.ngram_min, args.ngram_max),
-                    max_features=args.tfidf_max_features,
-                    top_per_doc=args.tfidf_top_per_doc,
-                    min_df=tf_min_df,
-                    max_df=args.tfidf_max_df,
-                )
-                synthetic_keywords, synthetic_df = extract_ngrams_keywords_per_doc(
-                    synthetic_docs,
-                    ngram_range=(args.ngram_min, args.ngram_max),
-                    max_features=args.tfidf_max_features,
-                    top_per_doc=args.tfidf_top_per_doc,
-                    min_df=tf_min_df,
-                    max_df=args.tfidf_max_df,
-                )
-            elif method_name == 'yake':
-                human_keywords, human_df = extract_yake_keywords_per_doc(
-                    human_docs,
-                    top_per_doc=args.yake_top_per_doc,
-                    max_ngram_size=args.yake_max_ngram,
-                    dedup_lim=args.yake_dedup,
-                )
-                synthetic_keywords, synthetic_df = extract_yake_keywords_per_doc(
-                    synthetic_docs,
-                    top_per_doc=args.yake_top_per_doc,
-                    max_ngram_size=args.yake_max_ngram,
-                    dedup_lim=args.yake_dedup,
-                )
-            else:  # textrank
-                human_keywords, human_df = extract_textrank_keywords_per_doc(
-                    human_docs,
-                    top_per_doc=args.textrank_top_per_doc,
-                    ratio=args.textrank_ratio,
-                )
-                synthetic_keywords, synthetic_df = extract_textrank_keywords_per_doc(
-                    synthetic_docs,
-                    top_per_doc=args.textrank_top_per_doc,
-                    ratio=args.textrank_ratio,
-                )
-            
-            # Вычисляем метрики пересечения
-            overlap_metrics = calculate_keyword_overlap(human_keywords, synthetic_keywords)
-            # Защита от вырожденных метрик: если union пуст или обе выборки пустые, помечаем как NaN
-            if (not human_keywords) and (not synthetic_keywords):
-                overlap_metrics.update({'jaccard': float('nan'), 'overlap_human': float('nan'), 'overlap_synthetic': float('nan'), 'harmonic_mean': float('nan')})
-            
-            # Анализируем разнообразие
-            human_diversity = analyze_keyword_diversity(human_keywords)
-            synthetic_diversity = analyze_keyword_diversity(synthetic_keywords)
-            
-            topic_results[method_name] = {
-                'human_keywords': human_keywords,
-                'synthetic_keywords': synthetic_keywords,
-                'overlap_metrics': overlap_metrics,
-                'human_diversity': human_diversity,
-                'synthetic_diversity': synthetic_diversity,
-                'human_docfreq': human_df,
-                'synthetic_docfreq': synthetic_df
-            }
-            
-            print(f"    Найдено ключевых слов: человеческие {len(human_keywords)}, синтетические {len(synthetic_keywords)}")
-            print(f"    Jaccard: {overlap_metrics['jaccard']:.3f}, Harmonic Mean: {overlap_metrics['harmonic_mean']:.3f}")
-        
-        results[topic] = topic_results
     
-    # Сохраняем результаты в JSON
-    json_path = os.path.join(args.output_dir, 'experiment1_results.json')
-    with open(json_path, 'w', encoding='utf-8') as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
-    
-    # Создаем графики
+    # Создаем визуализации
+    print(f"\nГрафики сохранены в папке: {args.output_dir}")
     create_visualizations(results, args.output_dir)
     
     # Генерируем отчет
-    report_path = os.path.join(args.output_dir, 'experiment1_report.md')
-    generate_markdown_report(results, report_path)
+    generate_markdown_report(results, args.output_dir)
+    
+    # Сохраняем JSON данные
+    json_data = {}
+    for method, data in results.items():
+        json_data[method] = {
+            'overlap_metrics': data['overlap_metrics'],
+            'human_diversity': data['human_diversity'],
+            'synthetic_diversity': data['synthetic_diversity'],
+            'top_human_keywords': list(data['human_df'].items())[:10],
+            'top_synthetic_keywords': list(data['synthetic_df'].items())[:10]
+        }
+    
+    with open(os.path.join(args.output_dir, 'experiment1_results.json'), 'w', encoding='utf-8') as f:
+        json.dump(json_data, f, ensure_ascii=False, indent=2)
     
     print(f"\nЭксперимент завершен!")
     print(f"Результаты сохранены в: {args.output_dir}")
-    print(f"Отчет: {report_path}")
-    print(f"JSON данные: {json_path}")
+    print(f"Отчет: {args.output_dir}/experiment1_report.md")
+    print(f"JSON данные: {args.output_dir}/experiment1_results.json")
 
 
 if __name__ == "__main__":
