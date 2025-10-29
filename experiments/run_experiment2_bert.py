@@ -35,6 +35,13 @@ except ImportError:
     print("Warning: PyTorch/Transformers not available. Install with: pip install torch transformers")
 
 try:
+    from sentence_transformers import SentenceTransformer
+    ST_AVAILABLE = True
+except Exception:
+    ST_AVAILABLE = False
+    print("Warning: sentence-transformers not available. Install with: pip install sentence-transformers")
+
+try:
     from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold
     from sklearn.neural_network import MLPClassifier
     from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
@@ -83,9 +90,10 @@ def load_documents_from_txt_dir(txt_dir: str, count: int = 15) -> List[str]:
 class EmbeddingExtractor:
     """Класс для извлечения эмбеддингов из текстов"""
     
-    def __init__(self, model_name: str, max_length: int = 512):
+    def __init__(self, model_name: str, max_length: int = 512, pooling: str = 'cls'):
         self.model_name = model_name
         self.max_length = max_length
+        self.pooling = pooling  # 'cls' or 'mean'
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         if not TORCH_AVAILABLE:
@@ -122,22 +130,34 @@ class EmbeddingExtractor:
             # Извлечение эмбеддингов
             with torch.no_grad():
                 outputs = self.model(**encoded)
-                # Используем [CLS] токен (первый токен) для получения эмбеддинга предложения
-                batch_embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
+                if self.pooling == 'mean' and hasattr(outputs, 'last_hidden_state'):
+                    # mean pooling с маской внимания
+                    token_embeddings = outputs.last_hidden_state  # [B, T, H]
+                    input_mask_expanded = encoded['attention_mask'].unsqueeze(-1).expand(token_embeddings.size()).float()
+                    sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, dim=1)
+                    sum_mask = torch.clamp(input_mask_expanded.sum(dim=1), min=1e-9)
+                    batch_embeddings = (sum_embeddings / sum_mask).cpu().numpy()
+                else:
+                    # [CLS]
+                    batch_embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
                 embeddings.extend(batch_embeddings)
         
         return np.array(embeddings)
 
 
-def extract_embeddings_multiple_models(texts: List[str], model_names: List[str]) -> Dict[str, np.ndarray]:
+def extract_embeddings_multiple_models(texts: List[str], model_names: List[str], pooling: str = 'cls') -> Dict[str, np.ndarray]:
     """Извлекает эмбеддинги для нескольких моделей"""
     embeddings = {}
     
     for model_name in model_names:
         print(f"Extracting embeddings with {model_name}...")
         try:
-            extractor = EmbeddingExtractor(model_name)
-            embeddings[model_name] = extractor.extract_embeddings(texts)
+            if ST_AVAILABLE and (model_name.startswith('sentence-transformers') or 'all-mpnet' in model_name or 'e5-' in model_name or model_name.startswith('intfloat/')):
+                st_model = SentenceTransformer(model_name)
+                embeddings[model_name] = st_model.encode(texts, batch_size=64, show_progress_bar=False, convert_to_numpy=True, normalize_embeddings=False)
+            else:
+                extractor = EmbeddingExtractor(model_name, pooling=pooling)
+                embeddings[model_name] = extractor.extract_embeddings(texts)
             print(f"Extracted {embeddings[model_name].shape[0]} embeddings of dimension {embeddings[model_name].shape[1]}")
         except Exception as e:
             print(f"Error extracting embeddings with {model_name}: {e}")
@@ -209,6 +229,65 @@ def train_mlp_classifier(X: np.ndarray, y: np.ndarray, test_size: float = 0.2, r
         'y_pred_proba': y_pred_proba,
         'feature_importance': None  # MLP не предоставляет feature importance напрямую
     }
+
+
+def train_baselines(X: np.ndarray, y: np.ndarray, test_size: float = 0.2, random_state: int = 42) -> Dict[str, Dict]:
+    from sklearn.model_selection import train_test_split, cross_val_score
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.svm import LinearSVC
+    from sklearn.calibration import CalibratedClassifierCV
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state, stratify=y)
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+
+    out = {}
+
+    # Logistic Regression
+    logreg = LogisticRegression(max_iter=2000, n_jobs=None)
+    logreg.fit(X_train, y_train)
+    y_pred = logreg.predict(X_test)
+    y_proba = logreg.predict_proba(X_test)[:, 1]
+    cv_scores = cross_val_score(logreg, X_train, y_train, cv=5, scoring='accuracy')
+    out['logreg'] = {
+        'model': logreg,
+        'scaler': scaler,
+        'accuracy': logreg.score(X_test, y_test),
+        'auc_score': roc_auc_score(y_test, y_proba),
+        'cv_mean': cv_scores.mean(),
+        'cv_std': cv_scores.std(),
+        'classification_report': classification_report(y_test, y_pred, output_dict=True),
+        'confusion_matrix': confusion_matrix(y_test, y_pred),
+        'y_test': y_test,
+        'y_pred': y_pred,
+        'y_pred_proba': y_proba,
+    }
+
+    # Linear SVM (calibrated)
+    base_svm = LinearSVC()
+    svm = CalibratedClassifierCV(base_svm, method='sigmoid', cv=5)
+    svm.fit(X_train, y_train)
+    y_pred = svm.predict(X_test)
+    y_proba = svm.predict_proba(X_test)[:, 1]
+    cv_scores = cross_val_score(svm, X_train, y_train, cv=5, scoring='accuracy')
+    out['linear_svm'] = {
+        'model': svm,
+        'scaler': scaler,
+        'accuracy': svm.score(X_test, y_test),
+        'auc_score': roc_auc_score(y_test, y_proba),
+        'cv_mean': cv_scores.mean(),
+        'cv_std': cv_scores.std(),
+        'classification_report': classification_report(y_test, y_pred, output_dict=True),
+        'confusion_matrix': confusion_matrix(y_test, y_pred),
+        'y_test': y_test,
+        'y_pred': y_pred,
+        'y_pred_proba': y_proba,
+    }
+
+    return out
 
 
 def create_classification_visualizations(results: Dict, output_dir: str):
@@ -409,9 +488,13 @@ def main():
     parser.add_argument("--docs_per_topic", type=int, default=15, help="Количество документов на тему")
     parser.add_argument("--models", nargs="+", default=[
         "bert-base-uncased",
-        "roberta-base", 
-        "albert-base-v2"
+        "roberta-base",
+        "albert-base-v2",
+        # дополнительные sentence-transformers
+        "sentence-transformers/all-mpnet-base-v2",
+        "intfloat/e5-large-v2"
     ], help="Список моделей для извлечения эмбеддингов")
+    parser.add_argument("--pooling", choices=["cls","mean"], default="mean", help="Pooling для базовых HF моделей")
     args = parser.parse_args()
     
     if not TORCH_AVAILABLE:
@@ -486,7 +569,7 @@ def main():
         all_labels = [0] * len(human_docs) + [1] * len(synth_docs)
 
         # Эмбеддинги для всех выбранных моделей
-        embeddings_dict = extract_embeddings_multiple_models(all_texts, args.models)
+        embeddings_dict = extract_embeddings_multiple_models(all_texts, args.models, pooling=args.pooling)
 
         # Обучение классификатора для каждой embedding‑модели
         results[synth_name] = {}
@@ -496,7 +579,14 @@ def main():
             print(f"Обучение MLP для {model_name} на {synth_name}...")
             try:
                 res = train_mlp_classifier(embeddings, np.array(all_labels))
+                # Сохраняем результат MLP
                 results[synth_name][model_name] = res
+                # Обучаем дополнительные классifikаторы
+                print(f"Обучение базовых моделей (logreg, linear_svm) для {model_name} на {synth_name}...")
+                baselines = train_baselines(embeddings, np.array(all_labels))
+                # добавим как отдельные строки с суффиксом
+                for clf_name, clf_res in baselines.items():
+                    results[synth_name][f"{model_name}/{clf_name}"] = clf_res
                 print(f"{synth_name} | {model_name}: Acc={res['accuracy']:.3f}, AUC={res['auc_score']:.3f}")
             except Exception as e:
                 print(f"Error training {model_name} on {synth_name}: {e}")
