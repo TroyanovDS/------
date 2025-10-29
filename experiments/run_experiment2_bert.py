@@ -425,122 +425,196 @@ def main():
     # Создаем папку для результатов
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     
-    # Пути к данным
-    data_paths = {
-        'text_mining': {
-            'human': 'data/arxiv_docs/text_mining.csv',
-            'synthetic': {
-                'llama': 'data/ai/llama_api_text/text_mining_full',
-                'qwen': 'data/ai/qwen_api_auto/text_mining_full',
-                'deepseek': 'data/ai/deepseek_api_auto/text_mining_full'
-            }
-        },
-        'information_retrieval': {
-            'human': 'data/arxiv_docs/information_retrieval.csv',
-            'synthetic': {
-                'llama': 'data/ai/llama_api/ir',
-                'qwen': 'data/ai/qwen_api/ir',
-                'deepseek': 'data/ai/deepseek_api/ir'
-            }
-        }
-    }
-    
     print("Запуск эксперимента 2: BERT-эмбеддинги + MLP классификатор...")
-    
-    # Собираем все тексты
-    all_texts = []
-    all_labels = []  # 0 для человеческих, 1 для синтетических
-    
-    for topic, paths in data_paths.items():
-        print(f"\nОбработка темы: {topic}")
-        
-        # Человеческие тексты
-        human_docs = load_documents_from_csv(paths['human'], args.docs_per_topic)
-        all_texts.extend(human_docs)
-        all_labels.extend([0] * len(human_docs))
-        print(f"Добавлено {len(human_docs)} человеческих документов")
-        
-        # Синтетические тексты
-        synthetic_docs = []
-        for model, path in paths['synthetic'].items():
-            docs = load_documents_from_txt_dir(path, args.docs_per_topic // 3)
-            synthetic_docs.extend(docs)
-            print(f"Добавлено {len(docs)} документов от {model}")
-        
-        all_texts.extend(synthetic_docs)
-        all_labels.extend([1] * len(synthetic_docs))
-        print(f"Всего синтетических документов: {len(synthetic_docs)}")
-    
-    print(f"\nОбщая выборка: {len(all_texts)} документов")
-    print(f"Человеческих: {sum(1 for l in all_labels if l == 0)}")
-    print(f"Синтетических: {sum(1 for l in all_labels if l == 1)}")
-    
-    if len(all_texts) == 0:
-        print("Error: No documents loaded")
-        return
-    
-    # Извлекаем эмбеддинги для всех моделей
-    embeddings_dict = extract_embeddings_multiple_models(all_texts, args.models)
-    
-    # Обучаем классификаторы
-    results = {}
-    
-    for model_name, embeddings in embeddings_dict.items():
-        if embeddings is None:
+
+    # Готовим HUMAN (50 TM + 50 IR) из TXT корпуса
+    human_tm = load_documents_from_txt_dir('data/human/text_mining', args.docs_per_topic)
+    human_ir = load_documents_from_txt_dir('data/human/information_retrieval', args.docs_per_topic)
+    human_docs = human_tm + human_ir
+    print(f"HUMAN документов: {len(human_docs)} (TM={len(human_tm)}, IR={len(human_ir)})")
+
+    # Синтетические модели и их пути
+    synthetic_models = {
+        'qwen': {
+            'tm': [
+                'data/ai/qwen_api_auto/text_mining_full',
+                'data/ai/qwen_api_text/text_mining_full',
+                'data/ai/qwen_api/text_mining_full',
+            ],
+            'ir': ['data/ai/qwen_api/ir']
+        },
+        'deepseek': {
+            'tm': [
+                'data/ai/deepseek_api_auto/text_mining_full',
+                'data/ai/deepseek_api_text/text_mining_full',
+                'data/ai/deepseek_api/text_mining_full',
+            ],
+            'ir': ['data/ai/deepseek_api/ir']
+        },
+        'gptoss': {
+            'tm': ['data/ai/gptoss_api/text_mining_full'],
+            'ir': ['data/ai/gptoss_api/ir']
+        },
+    }
+
+    results = {}  # results[synthetic_model][embedding_model] = metrics
+
+    for synth_name, synth_paths in synthetic_models.items():
+        # Загружаем 50 TM + 50 IR для конкретной модели
+        synth_docs_tm = []
+        for p in synth_paths['tm']:
+            if len(synth_docs_tm) >= args.docs_per_topic:
+                break
+            need = args.docs_per_topic - len(synth_docs_tm)
+            synth_docs_tm.extend(load_documents_from_txt_dir(p, need))
+
+        synth_docs_ir = []
+        for p in synth_paths['ir']:
+            if len(synth_docs_ir) >= args.docs_per_topic:
+                break
+            need = args.docs_per_topic - len(synth_docs_ir)
+            synth_docs_ir.extend(load_documents_from_txt_dir(p, need))
+
+        synth_docs = synth_docs_tm + synth_docs_ir
+        print(f"\nСинтетическая модель: {synth_name} (TM={len(synth_docs_tm)}, IR={len(synth_docs_ir)}, total={len(synth_docs)})")
+        if len(synth_docs) < 1 or len(human_docs) < 1:
+            print(f"Пропуск {synth_name}: недостаточно данных")
             continue
-            
-        print(f"\nОбучение MLP классификатора для {model_name}...")
-        
-        try:
-            result = train_mlp_classifier(embeddings, np.array(all_labels))
-            results[model_name] = result
-            
-            print(f"Accuracy: {result['accuracy']:.3f}")
-            print(f"AUC Score: {result['auc_score']:.3f}")
-            print(f"CV Mean: {result['cv_mean']:.3f} ± {result['cv_std']:.3f}")
-            
-        except Exception as e:
-            print(f"Error training classifier for {model_name}: {e}")
-            results[model_name] = {"error": str(e)}
+
+        # Собираем корпус: 100 HUMAN vs 100 AI
+        all_texts = human_docs + synth_docs
+        all_labels = [0] * len(human_docs) + [1] * len(synth_docs)
+
+        # Эмбеддинги для всех выбранных моделей
+        embeddings_dict = extract_embeddings_multiple_models(all_texts, args.models)
+
+        # Обучение классификатора для каждой embedding‑модели
+        results[synth_name] = {}
+        for model_name, embeddings in embeddings_dict.items():
+            if embeddings is None:
+                continue
+            print(f"Обучение MLP для {model_name} на {synth_name}...")
+            try:
+                res = train_mlp_classifier(embeddings, np.array(all_labels))
+                results[synth_name][model_name] = res
+                print(f"{synth_name} | {model_name}: Acc={res['accuracy']:.3f}, AUC={res['auc_score']:.3f}")
+            except Exception as e:
+                print(f"Error training {model_name} on {synth_name}: {e}")
+                results[synth_name][model_name] = {"error": str(e)}
     
     # Сохраняем результаты
     json_path = os.path.join(args.output_dir, 'experiment2_results.json')
     
-    # Конвертируем numpy arrays в списки для JSON сериализации
-    json_results = {}
-    for model_name, result in results.items():
-        json_result = {}
-        for key, value in result.items():
-            if key in ['model', 'scaler']:  # Пропускаем модели и скейлеры
-                continue
-            elif isinstance(value, np.ndarray):
-                json_result[key] = value.tolist()
-            elif hasattr(value, 'tolist'):  # numpy scalars
-                json_result[key] = value.tolist()
-            else:
-                json_result[key] = value
-        json_results[model_name] = json_result
+    # Конвертация numpy для JSON: глубоко по словарю
+    def to_jsonable(obj):
+        if isinstance(obj, dict):
+            return {k: to_jsonable(v) for k, v in obj.items() if k not in ['model', 'scaler']}
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if hasattr(obj, 'tolist'):
+            try:
+                return obj.tolist()
+            except Exception:
+                return str(obj)
+        return obj
+
+    json_results = to_jsonable(results)
     
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(json_results, f, ensure_ascii=False, indent=2)
     
-    # Сохраняем модели
-    models_path = os.path.join(args.output_dir, 'trained_models.pkl')
-    with open(models_path, 'wb') as f:
-        pickle.dump(results, f)
+    # Сохраняем модели (может быть большим) — опционально
+    # models_path = os.path.join(args.output_dir, 'trained_models.pkl')
+    # with open(models_path, 'wb') as f:
+    #     pickle.dump(results, f)
     
-    # Создаем визуализации
-    create_classification_visualizations(results, args.output_dir)
+    # Визуализации по каждой синтетической модели
+    # Перестроим графики: по synth_name строим classification_metrics_{synth}.png, roc_curves_{synth}.png, confusion_matrices_{synth}.png
+    for synth_name, res_by_embed in results.items():
+        fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+        fig.suptitle(f'Классификация HUMAN vs {synth_name.upper()}', fontsize=16, fontweight='bold')
+        metric_keys = ['accuracy', 'auc_score', 'cv_mean', 'cv_std']
+        names = ['Accuracy', 'AUC', 'CV Mean', 'CV Std']
+        embed_names = list(res_by_embed.keys())
+        for i, (mk, nm) in enumerate(zip(metric_keys, names)):
+            ax = axes[i//2, i%2]
+            vals = [res_by_embed[m].get(mk, 0) for m in embed_names]
+            bars = ax.bar(range(len(embed_names)), vals)
+            ax.set_title(nm)
+            ax.set_xticks(range(len(embed_names)))
+            ax.set_xticklabels(embed_names, rotation=45, ha='right')
+            for b, v in zip(bars, vals):
+                ax.text(b.get_x()+b.get_width()/2, v+0.005, f'{v:.3f}', ha='center', va='bottom')
+            ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(args.output_dir, f'classification_metrics_{synth_name}.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+
+        # ROC per synth
+        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+        for embed, r in res_by_embed.items():
+            if 'y_test' in r and 'y_pred_proba' in r:
+                fpr, tpr, _ = roc_curve(r['y_test'], r['y_pred_proba'])
+                ax.plot(fpr, tpr, label=f'{embed} (AUC={r.get("auc_score",0):.3f})')
+        ax.plot([0,1],[0,1],'k--')
+        ax.set_title(f'ROC: HUMAN vs {synth_name.upper()}')
+        ax.set_xlabel('FPR')
+        ax.set_ylabel('TPR')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(args.output_dir, f'roc_curves_{synth_name}.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+
+        # Confusion matrices per synth
+        n = len([1 for r in res_by_embed.values() if 'confusion_matrix' in r])
+        if n > 0:
+            fig, axes = plt.subplots(1, n, figsize=(5*n, 4))
+            if n == 1:
+                axes = [axes]
+            i = 0
+            for embed, r in res_by_embed.items():
+                if 'confusion_matrix' not in r:
+                    continue
+                cm = r['confusion_matrix']
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=axes[i],
+                            xticklabels=['Human','AI'], yticklabels=['Human','AI'])
+                axes[i].set_title(embed)
+                i += 1
+            fig.suptitle(f'Confusion Matrices: HUMAN vs {synth_name.upper()}')
+            plt.tight_layout()
+            plt.savefig(os.path.join(args.output_dir, f'confusion_matrices_{synth_name}.png'), dpi=300, bbox_inches='tight')
+            plt.close()
     
     # Генерируем отчет
     report_path = os.path.join(args.output_dir, 'experiment2_report.md')
-    generate_classification_report(results, report_path)
+    # Перепишем отчёт под разрез по синтетическим моделям
+    with open(report_path, 'w', encoding='utf-8') as f:
+        f.write("# Эксперимент 2: Детекция AI-текстов с помощью эмбеддингов (пер‑модельный разрез)\n\n")
+        f.write("## Методология\n\n")
+        f.write("- **Корпуса**: 100 HUMAN (50 TM + 50 IR) против 100 AI на каждую синтетическую модель\n")
+        f.write("- **Эмбеддинги**: " + ", ".join(args.models) + "\n")
+        f.write("- **Классификатор**: MLP, train/test + 5‑fold CV\n\n")
+        for synth_name, res_by_embed in results.items():
+            f.write(f"## Модель синтетики: {synth_name.upper()}\n\n")
+            f.write("### Сводная таблица по эмбеддингам\n\n")
+            f.write("| Embedding | Accuracy | AUC | CV Mean | CV Std |\n")
+            f.write("|-----------|----------|-----|---------|--------|\n")
+            for embed, r in res_by_embed.items():
+                if 'accuracy' in r:
+                    f.write(f"| {embed} | {r.get('accuracy',0):.3f} | {r.get('auc_score',0):.3f} | {r.get('cv_mean',0):.3f} | {r.get('cv_std',0):.3f} |\n")
+            f.write("\n")
+            f.write(f"![Метрики](classification_metrics_{synth_name}.png)\n\n")
+            f.write(f"![ROC](roc_curves_{synth_name}.png)\n\n")
+            cm_path = os.path.join(args.output_dir, f'confusion_matrices_{synth_name}.png')
+            if os.path.exists(cm_path):
+                f.write(f"![Матрицы ошибок](confusion_matrices_{synth_name}.png)\n\n")
     
     print(f"\nЭксперимент 2 завершен!")
     print(f"Результаты сохранены в: {args.output_dir}")
     print(f"Отчет: {report_path}")
     print(f"JSON данные: {json_path}")
-    print(f"Обученные модели: {models_path}")
+    # print(f"Обученные модели: {models_path}")
 
 
 if __name__ == "__main__":
