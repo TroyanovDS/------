@@ -30,6 +30,7 @@ sys.path.append(os.path.dirname(__file__))
 import run_experiment1_keywords as exp1
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics import roc_auc_score, roc_curve
 
 
 CONNECTIVES = [
@@ -42,6 +43,28 @@ CONNECTIVES = [
     # уточнение
     "in particular", "notably", "specifically",
 ]
+def load_connectives_from_file(path: str) -> list[str]:
+    items: list[str] = []
+    try:
+        with open(path, 'r', encoding='utf-8') as fh:
+            for line in fh:
+                term = line.strip().lower()
+                if not term:
+                    continue
+                if term.startswith('#'):
+                    continue
+                items.append(term)
+    except Exception:
+        return []
+    # Уникализируем и сохраняем порядок
+    seen = set()
+    out: list[str] = []
+    for t in items:
+        if t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
+
 
 
 # ------------------------
@@ -235,6 +258,70 @@ def compute_connectives_rate(documents: List[str]) -> float:
             pattern = r"\b" + re.escape(conn) + r"\b"
             total_hits += len(re.findall(pattern, lowered))
     return 1000.0 * total_hits / max(1, total_words)
+
+
+def compute_connectives_detection(human_docs: List[str], synth_docs: List[str]) -> dict:
+    # Обучаем детектор на непрерывном признаке (частота connectives)
+    human_rates = []
+    synth_rates = []
+    for doc in human_docs:
+        text = exp1.preprocess_text(doc)
+        words = re.findall(r"[a-zA-Z']+", text)
+        total = max(1, len(words))
+        lowered = ' ' + text + ' '
+        hits = 0
+        for conn in CONNECTIVES:
+            pattern = r"\b" + re.escape(conn) + r"\b"
+            hits += len(re.findall(pattern, lowered))
+        human_rates.append(1000.0 * hits / float(total))
+    for doc in synth_docs:
+        text = exp1.preprocess_text(doc)
+        words = re.findall(r"[a-zA-Z']+", text)
+        total = max(1, len(words))
+        lowered = ' ' + text + ' '
+        hits = 0
+        for conn in CONNECTIVES:
+            pattern = r"\b" + re.escape(conn) + r"\b"
+            hits += len(re.findall(pattern, lowered))
+        synth_rates.append(1000.0 * hits / float(total))
+
+    if not human_rates or not synth_rates:
+        return {
+            'human_mean': float(np.mean(human_rates) if human_rates else 0.0),
+            'synth_mean': float(np.mean(synth_rates) if synth_rates else 0.0),
+            'auc': float('nan'),
+            'best_threshold': float('nan'),
+            'threshold_direction': '>=',
+            'accuracy_at_best': float('nan'),
+        }
+
+    scores = human_rates + synth_rates
+    labels = [0] * len(human_rates) + [1] * len(synth_rates)
+    auc = float(roc_auc_score(labels, scores))
+    fpr, tpr, thresholds = roc_curve(labels, scores)
+    youden = tpr - fpr
+    idx = int(np.argmax(youden))
+    thr = float(thresholds[idx])
+
+    h_mean = float(np.mean(human_rates))
+    s_mean = float(np.mean(synth_rates))
+    synth_greater = s_mean >= h_mean
+    preds = []
+    for s in scores:
+        if synth_greater:
+            preds.append(1 if s >= thr else 0)
+        else:
+            preds.append(1 if s <= thr else 0)
+    acc = float((np.array(preds) == np.array(labels)).mean())
+
+    return {
+        'human_mean': h_mean,
+        'synth_mean': s_mean,
+        'auc': auc,
+        'best_threshold': thr,
+        'threshold_direction': '>=' if synth_greater else '<=',
+        'accuracy_at_best': acc,
+    }
 
 
 def extract_all_methods(human_docs: List[str], synth_docs: List[str], args) -> Dict[str, Dict]:
@@ -441,9 +528,17 @@ def main():
     # TextRank
     parser.add_argument('--textrank_top_per_doc', type=int, default=20)
     parser.add_argument('--textrank_ratio', type=float, default=0.2)
+    parser.add_argument('--connectives_path', default='', help='Путь к файлу со списком вводных/связующих слов (по одному на строку)')
     args = parser.parse_args()
 
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+
+    # Подменяем набор CONNECTIVES из файла при наличии
+    if args.connectives_path and os.path.exists(args.connectives_path):
+        loaded = load_connectives_from_file(args.connectives_path)
+        if loaded:
+            print(f"Загружено вводных слов: {len(loaded)} из {args.connectives_path}")
+            globals()['CONNECTIVES'] = loaded
 
     print('Загрузка HUMAN корпусов...')
     human_docs = load_human_docs(args.human_root, args.human_per_topic)

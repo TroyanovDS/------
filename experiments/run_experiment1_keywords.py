@@ -42,6 +42,7 @@ except ImportError:
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics import roc_auc_score, roc_curve
 
 
 def load_documents_from_csv(csv_path: str, count: int = 15) -> List[str]:
@@ -82,6 +83,117 @@ def preprocess_text(text: str) -> str:
     # Убираем специальные символы, оставляем только буквы, цифры и пробелы
     text = re.sub(r'[^\w\s]', ' ', text)
     return text.lower().strip()
+
+
+# -------------------------------------------
+# Вводные/связующие слова (connectives) и метрики по ним
+# -------------------------------------------
+CONNECTIVES: List[str] = [
+    # contrast/consequence
+    "however", "therefore", "thus", "hence", "nevertheless", "nonetheless",
+    # addition/examples
+    "moreover", "furthermore", "in addition", "additionally", "for example", "for instance",
+    # comparison/contrast
+    "in contrast", "on the other hand", "similarly",
+    # specification
+    "in particular", "notably", "specifically",
+]
+
+
+def _connectives_rate(text: str, connectives: List[str]) -> float:
+    """Возвращает число вхождений connectives на 1000 слов для одного документа."""
+    clean = preprocess_text(text)
+    words = re.findall(r"[a-zA-Z']+", clean)
+    total = max(1, len(words))
+    lowered = f" {clean} "
+    hits = 0
+    for conn in connectives:
+        pattern = r"\b" + re.escape(conn) + r"\b"
+        hits += len(re.findall(pattern, lowered))
+    return 1000.0 * hits / float(total)
+
+
+def load_connectives_from_file(path: str) -> List[str]:
+    items: List[str] = []
+    try:
+        with open(path, 'r', encoding='utf-8') as fh:
+            for line in fh:
+                term = line.strip().lower()
+                if not term or term.startswith('#'):
+                    continue
+                items.append(term)
+    except Exception:
+        return []
+    # deduplicate preserving order
+    seen = set()
+    out: List[str] = []
+    for t in items:
+        if t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
+
+
+def compute_connectives_detection(human_docs: List[str], synthetic_docs: List[str]) -> Dict[str, float | List[float]]:
+    """Считает распределения частоты connectives (на 1000 слов) и подбирает порог для детекции.
+
+    Возвращает словарь с:
+    - human_mean, synth_mean
+    - auc
+    - best_threshold
+    - threshold_direction ('>=' или '<=')
+    - accuracy_at_best
+    - human_rates, synth_rates (для визуализации)
+    """
+    human_rates = [_connectives_rate(doc, CONNECTIVES) for doc in human_docs]
+    synth_rates = [_connectives_rate(doc, CONNECTIVES) for doc in synthetic_docs]
+
+    if not human_rates or not synth_rates:
+        return {
+            'human_mean': float(np.mean(human_rates) if human_rates else 0.0),
+            'synth_mean': float(np.mean(synth_rates) if synth_rates else 0.0),
+            'auc': float('nan'),
+            'best_threshold': float('nan'),
+            'threshold_direction': '>=',
+            'accuracy_at_best': float('nan'),
+            'human_rates': human_rates,
+            'synth_rates': synth_rates,
+        }
+
+    scores = human_rates + synth_rates
+    labels = [0] * len(human_rates) + [1] * len(synth_rates)  # 1 = synthetic
+
+    auc = float(roc_auc_score(labels, scores))
+
+    fpr, tpr, thresholds = roc_curve(labels, scores)
+    youden = tpr - fpr
+    idx = int(np.argmax(youden))
+    raw_threshold = thresholds[idx]
+
+    human_mean = float(np.mean(human_rates))
+    synth_mean = float(np.mean(synth_rates))
+    synth_greater = synth_mean >= human_mean
+
+    preds = []
+    for s in scores:
+        if synth_greater:
+            preds.append(1 if s >= raw_threshold else 0)
+        else:
+            preds.append(1 if s <= raw_threshold else 0)
+    preds = np.array(preds)
+    labels_arr = np.array(labels)
+    accuracy = float((preds == labels_arr).mean())
+
+    return {
+        'human_mean': human_mean,
+        'synth_mean': synth_mean,
+        'auc': auc,
+        'best_threshold': float(raw_threshold),
+        'threshold_direction': '>=' if synth_greater else '<=',
+        'accuracy_at_best': accuracy,
+        'human_rates': human_rates,
+        'synth_rates': synth_rates,
+    }
 
 
 def extract_ngrams_keywords_per_doc(
@@ -404,6 +516,51 @@ def create_visualizations(results: Dict, output_dir: str):
     print(f"Графики сохранены в папке: {output_dir}")
 
 
+def create_connectives_plots(conn_results: Dict[str, float | List[float]], output_dir: str):
+    """Рисует графики для метрик по вводным словам: распределения и сравнение средних."""
+    try:
+        plt.style.use('seaborn-v0_8')
+    except Exception:
+        plt.style.use('default')
+    if USE_SEABORN:
+        try:
+            sns.set_palette('colorblind')
+        except Exception:
+            pass
+
+    # Гистограммы распределений
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    human_rates = conn_results.get('human_rates', [])
+    synth_rates = conn_results.get('synth_rates', [])
+    if human_rates:
+        ax.hist(human_rates, bins=20, alpha=0.6, label='HUMAN', color='#1f77b4', density=True)
+    if synth_rates:
+        ax.hist(synth_rates, bins=20, alpha=0.6, label='AI', color='#ff7f0e', density=True)
+    bt = conn_results.get('best_threshold')
+    if isinstance(bt, float) and not np.isnan(bt):
+        ax.axvline(bt, color='red', linestyle='--', label=f"Threshold {conn_results.get('threshold_direction','>=')} {bt:.2f}")
+    ax.set_title('Connectives per 1000 words — распределения')
+    ax.set_xlabel('rate per 1000')
+    ax.set_ylabel('density')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'connectives_distribution.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+
+    # Сравнение средних
+    fig, ax = plt.subplots(1, 1, figsize=(6, 5))
+    ax.bar([0, 1], [conn_results.get('human_mean', 0.0), conn_results.get('synth_mean', 0.0)],
+           color=['#1f77b4', '#ff7f0e'])
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(['HUMAN', 'AI'])
+    ax.set_title('Connectives per 1000 — средние')
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'connectives_bar.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+
+
 def generate_markdown_report(results: Dict, output_dir: str):
     """Генерирует отчет в формате Markdown"""
     
@@ -427,6 +584,9 @@ def generate_markdown_report(results: Dict, output_dir: str):
         f.write("![Топ ключевых слов](top_keywords_comparison.png)\n\n")
         f.write("### Анализ разнообразия\n\n")
         f.write("![Анализ разнообразия](diversity_analysis.png)\n\n")
+        f.write("### Вводные/связующие слова\n\n")
+        f.write("![Распределения](connectives_distribution.png)\n\n")
+        f.write("![Средние](connectives_bar.png)\n\n")
         
         f.write("## Результаты по методам\n\n")
         
@@ -472,6 +632,23 @@ def generate_markdown_report(results: Dict, output_dir: str):
                 
                 f.write("---\n\n")
         
+        # Блок по connectives
+        conn = results.get('connectives', {})
+        if conn:
+            f.write("## Детекция по вводным словам (connectives)\n\n")
+            f.write("- Признак: частота вводных/связующих слов на 1000 слов.\n")
+            f.write("- Метрики: AUC по непрерывному признаку, порог Юдена, Accuracy на лучшем пороге.\n\n")
+            f.write(f"- HUMAN mean: {conn.get('human_mean', 0.0):.2f}\n")
+            f.write(f"- AI mean: {conn.get('synth_mean', 0.0):.2f}\n")
+            f.write(f"- AUC: {conn.get('auc', float('nan')):.3f}\n")
+            thr = conn.get('best_threshold', float('nan'))
+            dirn = conn.get('threshold_direction', '>=')
+            if thr == thr:
+                f.write(f"- Лучший порог: {dirn} {thr:.2f}\n")
+                f.write(f"- Accuracy @ threshold: {conn.get('accuracy_at_best', 0.0):.3f}\n\n")
+            else:
+                f.write("- Порог не определён (недостаточно данных)\n\n")
+
         # Общие выводы
         f.write("## Общие выводы\n\n")
         
@@ -514,6 +691,7 @@ def main():
     parser = argparse.ArgumentParser(description="Эксперимент 1: Анализ ключевых слов")
     parser.add_argument("--output_dir", default="results/experiment1", help="Папка для результатов")
     parser.add_argument("--docs_per_topic", type=int, default=15, help="Количество документов на тему")
+    parser.add_argument("--connectives_path", default="", help="Путь к файлу со списком вводных/связующих слов (по одному на строку)")
     # Тюнинг экстрактора TF-IDF
     parser.add_argument("--ngram_min", type=int, default=1)
     parser.add_argument("--ngram_max", type=int, default=3)
@@ -534,6 +712,13 @@ def main():
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     
     print("Запуск эксперимента 1: Анализ ключевых слов...")
+
+    # Подменяем набор CONNECTIVES из файла при наличии
+    if args.connectives_path and os.path.exists(args.connectives_path):
+        loaded_conn = load_connectives_from_file(args.connectives_path)
+        if loaded_conn:
+            print(f"Загружено вводных слов: {len(loaded_conn)} из {args.connectives_path}")
+            globals()['CONNECTIVES'] = loaded_conn
     
     # Собираем все документы в одну выборку
     all_human_docs = []
@@ -669,19 +854,49 @@ def main():
     # Создаем визуализации
     print(f"\nГрафики сохранены в папке: {args.output_dir}")
     create_visualizations(results, args.output_dir)
-    
+
+    # Connectives detection & визуализации
+    if all_human_docs and all_synthetic_docs:
+        conn_results = compute_connectives_detection(all_human_docs, all_synthetic_docs)
+    else:
+        conn_results = {
+            'human_mean': 0.0,
+            'synth_mean': 0.0,
+            'auc': float('nan'),
+            'best_threshold': float('nan'),
+            'threshold_direction': '>=',
+            'accuracy_at_best': float('nan'),
+            'human_rates': [],
+            'synth_rates': [],
+        }
+    results['connectives'] = conn_results
+    create_connectives_plots(conn_results, args.output_dir)
+
     # Генерируем отчет
     generate_markdown_report(results, args.output_dir)
     
     # Сохраняем JSON данные
     json_data = {}
     for method, data in results.items():
+        if method == 'connectives':
+            continue
         json_data[method] = {
             'overlap_metrics': data['overlap_metrics'],
             'human_diversity': data['human_diversity'],
             'synthetic_diversity': data['synthetic_diversity'],
             'top_human_keywords': list(data['human_df'].items())[:10],
             'top_synthetic_keywords': list(data['synthetic_df'].items())[:10]
+        }
+
+    # Добавляем connectives в JSON кратко
+    if 'connectives' in results:
+        json_data['connectives'] = {
+            'human_mean': results['connectives'].get('human_mean', 0.0),
+            'synth_mean': results['connectives'].get('synth_mean', 0.0),
+            'auc': results['connectives'].get('auc', float('nan')),
+            'best_threshold': results['connectives'].get('best_threshold', float('nan')),
+            'threshold_direction': results['connectives'].get('threshold_direction', '>='),
+            'accuracy_at_best': results['connectives'].get('accuracy_at_best', float('nan')),
         }
     
     with open(os.path.join(args.output_dir, 'experiment1_results.json'), 'w', encoding='utf-8') as f:
