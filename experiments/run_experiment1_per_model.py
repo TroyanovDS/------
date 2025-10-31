@@ -31,6 +31,7 @@ import run_experiment1_keywords as exp1
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.metrics import roc_auc_score, roc_curve
+from sklearn.metrics import roc_auc_score, roc_curve
 
 
 CONNECTIVES = [
@@ -78,6 +79,18 @@ def split_sentences(text: str) -> list[str]:
 
 def tokenize_words(text: str) -> list[str]:
     return re.findall(r"[A-Za-z']+", text.lower())
+
+
+def _connectives_rate(text: str, connectives: list[str]) -> float:
+    clean = exp1.preprocess_text(text)
+    words = re.findall(r"[a-zA-Z']+", clean)
+    total = max(1, len(words))
+    lowered = f" {clean} "
+    hits = 0
+    for conn in connectives:
+        pattern = r"\b" + re.escape(conn) + r"\b"
+        hits += len(re.findall(pattern, lowered))
+    return 1000.0 * hits / float(total)
 
 
 # ------------------------
@@ -258,6 +271,45 @@ def compute_connectives_rate(documents: List[str]) -> float:
             pattern = r"\b" + re.escape(conn) + r"\b"
             total_hits += len(re.findall(pattern, lowered))
     return 1000.0 * total_hits / max(1, total_words)
+
+
+def compute_connectives_detection(human_docs: List[str], synth_docs: List[str]) -> dict:
+    human_rates = [_connectives_rate(doc, CONNECTIVES) for doc in human_docs]
+    synth_rates = [_connectives_rate(doc, CONNECTIVES) for doc in synth_docs]
+    if not human_rates or not synth_rates:
+        return {
+            'human_mean': float(np.mean(human_rates) if human_rates else 0.0),
+            'synth_mean': float(np.mean(synth_rates) if synth_rates else 0.0),
+            'auc': float('nan'),
+            'best_threshold': float('nan'),
+            'threshold_direction': '>=',
+            'accuracy_at_best': float('nan'),
+        }
+    scores = human_rates + synth_rates
+    labels = [0] * len(human_rates) + [1] * len(synth_rates)
+    auc = float(roc_auc_score(labels, scores))
+    fpr, tpr, thresholds = roc_curve(labels, scores)
+    youden = tpr - fpr
+    idx = int(np.argmax(youden))
+    thr = float(thresholds[idx])
+    h_mean = float(np.mean(human_rates))
+    s_mean = float(np.mean(synth_rates))
+    synth_greater = s_mean >= h_mean
+    preds = []
+    for s in scores:
+        if synth_greater:
+            preds.append(1 if s >= thr else 0)
+        else:
+            preds.append(1 if s <= thr else 0)
+    acc = float((np.array(preds) == np.array(labels)).mean())
+    return {
+        'human_mean': h_mean,
+        'synth_mean': s_mean,
+        'auc': auc,
+        'best_threshold': thr,
+        'threshold_direction': '>=' if synth_greater else '<=',
+        'accuracy_at_best': acc,
+    }
 
 
 def compute_connectives_detection(human_docs: List[str], synth_docs: List[str]) -> dict:
@@ -474,6 +526,15 @@ def write_report(models: List[str], per_model_results: Dict[str, Dict], out_dir:
         f.write("- **Корпуса**: 100 человеческих (50 TM + 50 IR) против 100 синтетических на модель (LLAMA, QWEN, DEEPSEEK-R1)\n")
         f.write("- **Методы**: TF-IDF n-граммы, YAKE, TextRank\n")
         f.write("- **Метрики**: Jaccard, Overlap Human, Overlap Synthetic, Harmonic Mean; Connectives per 1000; TF-IDF cosine similarity\n\n")
+
+        # Метрики и формулы
+        f.write("## Метрики и формулы\n\n")
+        f.write("- Jaccard: J(A,B) = |A∩B| / |A∪B|\n")
+        f.write("- Overlap Human: |A∩B| / |A|; Overlap Synthetic: |A∩B| / |B|\n")
+        f.write("- Harmonic Mean: 2·OH·OS / (OH+OS)\n")
+        f.write("- Connectives per 1000: частота коннекторов на 1000 слов по словарю коннекторов\n")
+        f.write("- TF-IDF Cosine: cos(θ) = (c_H·c_A) / (||c_H||·||c_A||), где c_H,c_A — TF‑IDF центроиды HUMAN/AI\n\n")
+        f.write("Пример: при топ-50 слов у HUMAN/AI и пересечении = 20 получим J=0.25, Overlap=0.40/0.40, Harmonic=0.40 — это умеренное пересечение, не сильная схожесть.\n\n")
         for model in models:
             res = per_model_results[model]
             f.write(f"## Модель: {model.upper()}\n\n")
@@ -485,6 +546,9 @@ def write_report(models: List[str], per_model_results: Dict[str, Dict], out_dir:
                 f.write(f"| {m.upper()} | {om['jaccard']:.3f} | {om['overlap_human']:.3f} | {om['overlap_synthetic']:.3f} | {om['harmonic_mean']:.3f} |\n")
             f.write("\n")
             f.write(f"- Connectives per 1000 words: HUMAN={res['connectives_h']:.2f}, {model.upper()}={res['connectives_s']:.2f}\n")
+            cd = res.get('connectives_detection', {})
+            if cd:
+                f.write(f"- Connectives detection: AUC={cd.get('auc', float('nan')):.3f}, Threshold {cd.get('threshold_direction','>=')} {cd.get('best_threshold', float('nan')):.2f}, Acc@thr={cd.get('accuracy_at_best', float('nan')):.3f}\n")
             f.write(f"- TF-IDF centroid cosine similarity: {res['cosine_similarity']:.3f}\n\n")
             f.write(f"![Пересечения]({model}_overlaps.png)\n\n")
             f.write(f"![Вводные и косинус]({model}_connectives_cosine.png)\n\n")
@@ -502,10 +566,14 @@ def write_report(models: List[str], per_model_results: Dict[str, Dict], out_dir:
 
         # Интерпретация и применимость
         f.write("## Как использовать результаты для детекции AI-текстов\n\n")
-        f.write("- Низкие значения Jaccard/Harmonic указывают на различия в лексике и ключевых фразах между HUMAN и AI; это сигнал для детекции.\n")
-        f.write("- Connectives per 1000: переизбыток/недостаток связующих слов у AI относительно HUMAN позволяет построить простой линейный порог.\n")
-        f.write("- TF-IDF cosine similarity между центроидами корпусов: чем ниже сходство, тем проще отделять AI от HUMAN на уровне словаря.\n")
-        f.write("- Рекомендуется ансамбль из (TextRank Harmonic + Connectives gap + Cosine), что повышает устойчивость к перегенерациям.\n")
+        f.write("- Jaccard/Harmonic ~ 0.25–0.56 указывают лишь на умеренную разницу в наборах ключевых слов — этих сигналов недостаточно для надежной детекции в одиночку.\n")
+        f.write("- Connectives per 1000 даёт небольшой сдвиг (у AI часто ниже). Можно ставить простой порог, но точность ограничена.\n")
+        f.write("- TF‑IDF cosine (≈0.67–0.74) отражает умеренную разделимость словарей и подходит как вспомогательная фича.\n")
+        f.write("- Практический подход: объединять признаки в скоринг (например, Score = α·(1−Harmonic) + β·|ΔConnectives| + γ·(1−Cosine)) и валидировать порог на отложенной выборке. Основной детектор — семантический (см. Эксперимент 2).\n\n")
+
+        f.write("## Итоги по результатам и выводы\n\n")
+        f.write("- Лексические/стилистические метрики дают слабые–умеренные сигналы различий; использовать их стоит как часть ансамбля.\n")
+        f.write("- Для практической детекции рекомендуется совмещать Jaccard/Harmonic, Connectives per 1000 и TF‑IDF cosine; улучшение ожидаемо при добавлении семантических фич.\n")
 
 
 def main():
@@ -561,6 +629,7 @@ def main():
         conn_h = compute_connectives_rate(human_docs)
         conn_s = compute_connectives_rate(synth_docs)
         cos_sim = cosine_similarity_corpora(human_docs, synth_docs)
+        conn_det = compute_connectives_detection(human_docs, synth_docs)
 
         # Extra metrics
         ttr_h = corpus_ttr(human_docs)
@@ -583,6 +652,7 @@ def main():
             'connectives_h': conn_h,
             'connectives_s': conn_s,
             'cosine_similarity': cos_sim,
+            'connectives_detection': conn_det,
             'extra': {
                 'ttr_h': ttr_h, 'ttr_s': ttr_s,
                 'zipf_slope_h': slope_h, 'zipf_r2_h': r2_h,
