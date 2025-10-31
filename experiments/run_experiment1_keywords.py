@@ -232,8 +232,9 @@ def extract_ngrams_keywords_per_doc(
                 seen.add(term)
                 docfreq[term] = docfreq.get(term, 0) + 1
 
-        # Топ-50 по частоте по документам
-        top_keywords = [kw for kw, _ in sorted(docfreq.items(), key=lambda x: x[1], reverse=True)[:50]]
+        # Используем все уникальные ключевые слова (без ограничения на 50)
+        # Это позволяет видеть различия в размерах наборов между HUMAN и AI
+        top_keywords = [kw for kw, _ in sorted(docfreq.items(), key=lambda x: x[1], reverse=True)]
         return top_keywords, docfreq
     except Exception as e:
         print(f"Error extracting n-grams per doc: {e}")
@@ -265,7 +266,8 @@ def extract_yake_keywords_per_doc(
                     docfreq[kw] = docfreq.get(kw, 0) + 1
             except Exception:
                 continue
-        top_keywords = [kw for kw, _ in sorted(docfreq.items(), key=lambda x: x[1], reverse=True)[:50]]
+        # Используем все уникальные ключевые слова (без ограничения на 50)
+        top_keywords = [kw for kw, _ in sorted(docfreq.items(), key=lambda x: x[1], reverse=True)]
         return top_keywords, docfreq
     except Exception as e:
         print(f"Error extracting YAKE per doc: {e}")
@@ -297,7 +299,8 @@ def extract_textrank_keywords_per_doc(
                     docfreq[kw] = docfreq.get(kw, 0) + 1
             except Exception:
                 continue
-        top_keywords = [kw for kw, _ in sorted(docfreq.items(), key=lambda x: x[1], reverse=True)[:50]]
+        # Используем все уникальные ключевые слова (без ограничения на 50)
+        top_keywords = [kw for kw, _ in sorted(docfreq.items(), key=lambda x: x[1], reverse=True)]
         return top_keywords, docfreq
     except Exception as e:
         print(f"Error extracting TextRank per doc: {e}")
@@ -305,7 +308,20 @@ def extract_textrank_keywords_per_doc(
 
 
 def calculate_keyword_overlap(keywords1: List[str], keywords2: List[str]) -> Dict[str, float]:
-    """Вычисляет метрики пересечения ключевых слов"""
+    """
+    Вычисляет метрики пересечения ключевых слов между двумя наборами.
+    
+    Args:
+        keywords1: Первый набор ключевых слов (обычно HUMAN)
+        keywords2: Второй набор ключевых слов (обычно AI/SYNTHETIC)
+    
+    Returns:
+        Словарь с метриками:
+        - jaccard: Jaccard Index = |A∩B| / |A∪B|
+        - overlap_human: Доля слов из keywords1, которые присутствуют в keywords2 = |A∩B| / |A|
+        - overlap_synthetic: Доля слов из keywords2, которые присутствуют в keywords1 = |A∩B| / |B|
+        - harmonic_mean: Гармоническое среднее overlap_human и overlap_synthetic
+    """
     set1 = set(keywords1)
     set2 = set(keywords2)
     
@@ -314,11 +330,14 @@ def calculate_keyword_overlap(keywords1: List[str], keywords2: List[str]) -> Dic
     
     jaccard = len(intersection) / len(union) if union else 0.0
     
-    # Меры пересечения (НЕ классические метрики классификации!)
-    overlap_human = len(intersection) / len(set1) if set1 else 0.0  # Доля человеческих слов в синтетических
-    overlap_synthetic = len(intersection) / len(set2) if set2 else 0.0  # Доля синтетических слов в человеческих
+    # Меры пересечения (coverage metrics): показывают, какая доля одного набора покрыта другим
+    # overlap_human: какая доля человеческих ключевых слов найдена в синтетических
+    overlap_human = len(intersection) / len(set1) if set1 else 0.0
     
-    # Гармоническое среднее пересечений
+    # overlap_synthetic: какая доля синтетических ключевых слов найдена в человеческих
+    overlap_synthetic = len(intersection) / len(set2) if set2 else 0.0
+    
+    # Гармоническое среднее пересечений (балансирует обе метрики)
     harmonic_mean = 2 * overlap_human * overlap_synthetic / (overlap_human + overlap_synthetic) if (overlap_human + overlap_synthetic) > 0 else 0.0
     
     return {

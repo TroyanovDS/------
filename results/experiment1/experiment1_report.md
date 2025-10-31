@@ -35,117 +35,117 @@
 ### NGRAMS
 
 **Топ-10 ключевых слов (человеческие тексты):**
-1. training (частота: 15)
-2. user (частота: 15)
-3. retrieval (частота: 15)
-4. recommendation (частота: 15)
-5. llm (частота: 14)
-6. multi (частота: 13)
-7. reasoning (частота: 12)
-8. models (частота: 11)
-9. llms (частота: 11)
-10. data (частота: 11)
+1. multimodal (частота: 5)
+2. recommendation (частота: 5)
+3. model (частота: 4)
+4. items (частота: 4)
+5. user (частота: 4)
+6. fact (частота: 3)
+7. models (частота: 3)
+8. modeling (частота: 3)
+9. generation (частота: 3)
+10. space (частота: 3)
 
 **Топ-10 ключевых слов (синтетические тексты):**
-1. recommendation (частота: 11)
-2. retrieval (частота: 9)
-3. user (частота: 8)
-4. multi (частота: 6)
-5. multimodal (частота: 6)
-6. generation (частота: 6)
-7. benchmark (частота: 5)
-8. search (частота: 4)
-9. generative (частота: 4)
-10. generative recommendation (частота: 4)
+1. language (частота: 4)
+2. recommendation (частота: 4)
+3. spatial (частота: 3)
+4. multi (частота: 3)
+5. job (частота: 2)
+6. search (частота: 2)
+7. job search (частота: 2)
+8. semantic (частота: 2)
+9. semantic job (частота: 2)
+10. semantic job search (частота: 2)
 
 **Метрики пересечения:**
-- Jaccard Index: 0.266
-- Overlap Human: 0.420
-- Overlap Synthetic: 0.420
-- Harmonic Mean: 0.420
-- Пересечение: 21 из 50 и 50
+- Jaccard Index: 0.106
+- Overlap Human: 0.123
+- Overlap Synthetic: 0.433
+- Harmonic Mean: 0.191
+- Пересечение: 65 из 529 и 150
 
 **Анализ разнообразия:**
-- Человеческие тексты: уникальность 1.000, средняя длина 1.00
-- Синтетические тексты: уникальность 1.000, средняя длина 1.24
+- Человеческие тексты: уникальность 1.000, средняя длина 1.43
+- Синтетические тексты: уникальность 1.000, средняя длина 1.43
 
 ---
 
 ### YAKE
 
 **Топ-10 ключевых слов (человеческие тексты):**
-1. Abstract (частота: 48)
-2. Large Language (частота: 19)
-3. Language Models (частота: 19)
-4. Large Language Models (частота: 18)
-5. Language (частота: 9)
-6. large language models (частота: 8)
-7. Recommendation (частота: 8)
-8. Title (частота: 7)
-9. Models Abstract (частота: 6)
-10. Recommendation Abstract (частота: 6)
+1. Abstract (частота: 12)
+2. Language Models (частота: 5)
+3. Language (частота: 4)
+4. Large Language (частота: 4)
+5. Large Language Models (частота: 4)
+6. Models Abstract (частота: 3)
+7. large language models (частота: 3)
+8. Recommendation (частота: 3)
+9. Generation Abstract (частота: 3)
+10. Large Language Model (частота: 2)
 
 **Топ-10 ключевых слов (синтетические тексты):**
-1. Abstract (частота: 23)
-2. Recommendation (частота: 8)
-3. Generation Abstract (частота: 6)
-4. Multimodal (частота: 5)
-5. large language models (частота: 5)
-6. recommendation systems (частота: 4)
-7. Retrieval (частота: 4)
-8. Recommendation Abstract (частота: 4)
-9. Generative (частота: 4)
-10. Benchmark (частота: 4)
+1. Abstract (частота: 6)
+2. natural language processing (частота: 3)
+3. natural language (частота: 3)
+4. Recommendation (частота: 3)
+5. Efficient Small Language (частота: 2)
+6. Small Language Models (частота: 2)
+7. Small Language (частота: 2)
+8. Language Models Serving (частота: 2)
+9. Semantic Job Search (частота: 2)
+10. Job Search Abstract (частота: 2)
 
 **Метрики пересечения:**
-- Jaccard Index: 0.136
-- Overlap Human: 0.240
-- Overlap Synthetic: 0.240
-- Harmonic Mean: 0.240
-- Пересечение: 12 из 50 и 50
+- Jaccard Index: 0.060
+- Overlap Human: 0.071
+- Overlap Synthetic: 0.274
+- Harmonic Mean: 0.113
+- Пересечение: 40 из 560 и 146
 
 **Анализ разнообразия:**
-- Человеческие тексты: уникальность 1.000, средняя длина 1.92
-- Синтетические тексты: уникальность 1.000, средняя длина 1.98
+- Человеческие тексты: уникальность 1.000, средняя длина 2.32
+- Синтетические тексты: уникальность 1.000, средняя длина 2.26
 
 ---
 
 ### TEXTRANK
 
 **Топ-10 ключевых слов (человеческие тексты):**
-1. models (частота: 37)
-2. model (частота: 30)
-3. generation (частота: 17)
-4. retrieval (частота: 16)
-5. datasets (частота: 14)
-6. training (частота: 13)
-7. llms (частота: 13)
-8. language (частота: 11)
-9. data (частота: 11)
-10. recommendation (частота: 11)
+1. models (частота: 12)
+2. model (частота: 10)
+3. generation (частота: 6)
+4. retrieval (частота: 6)
+5. datasets (частота: 5)
+6. language (частота: 4)
+7. modeling (частота: 4)
+8. user (частота: 4)
+9. knowledge (частота: 4)
+10. evidence (частота: 4)
 
 **Топ-10 ключевых слов (синтетические тексты):**
-1. models (частота: 13)
-2. retrieval (частота: 13)
-3. recommendation (частота: 12)
-4. framework (частота: 11)
-5. model (частота: 11)
-6. user (частота: 9)
-7. significant (частота: 8)
-8. recommendations (частота: 8)
-9. generative (частота: 8)
-10. evaluation (частота: 7)
+1. systems (частота: 5)
+2. framework (частота: 5)
+3. query (частота: 4)
+4. user (частота: 4)
+5. recommendation (частота: 4)
+6. recommendations (частота: 4)
+7. semantic (частота: 3)
+8. language (частота: 3)
+9. spatial (частота: 3)
+10. queries (частота: 3)
 
 **Метрики пересечения:**
-- Jaccard Index: 0.316
-- Overlap Human: 0.480
-- Overlap Synthetic: 0.480
-- Harmonic Mean: 0.480
-- Пересечение: 24 из 50 и 50
+- Jaccard Index: 0.142
+- Overlap Human: 0.187
+- Overlap Synthetic: 0.372
+- Harmonic Mean: 0.249
+- Пересечение: 77 из 411 и 207
 
 **Анализ разнообразия:**
-- Человеческие тексты: уникальность 1.000, средняя длина 1.00
-- Синтетические тексты: уникальность 1.000, средняя длина 1.00
+- Человеческие тексты: уникальность 1.000, средняя длина 1.09
+- Синтетические тексты: уникальность 1.000, средняя длина 1.08
 
 ---
 
@@ -154,11 +154,11 @@
 - Признак: частота вводных/связующих слов на 1000 слов.
 - Метрики: AUC по непрерывному признаку, порог Юдена, Accuracy на лучшем пороге.
 
-- HUMAN mean: 4.27
-- AI mean: 4.97
-- AUC: 0.593
-- Лучший порог: >= 2.58
-- Accuracy @ threshold: 0.545
+- HUMAN mean: 15.03
+- AI mean: 14.68
+- AUC: 0.533
+- Лучший порог: <= 14.16
+- Accuracy @ threshold: 0.450
 
 ## Общие выводы
 
@@ -166,9 +166,9 @@
 
 | Метод | Jaccard | Harmonic Mean | Уникальность | Применимость для детекции |
 |-------|---------|---------------|--------------|---------------------------|
-| NGRAMS | 0.266 | 0.420 | 1.000 | ✅ Хорошая |
-| YAKE | 0.136 | 0.240 | 1.000 | ✅ Хорошая |
-| TEXTRANK | 0.316 | 0.480 | 1.000 | ✅ Хорошая |
+| NGRAMS | 0.106 | 0.191 | 1.000 | ⚠️ Умеренная |
+| YAKE | 0.060 | 0.113 | 1.000 | ⚠️ Умеренная |
+| TEXTRANK | 0.142 | 0.249 | 1.000 | ✅ Хорошая |
 
 ### Ключевые наблюдения
 

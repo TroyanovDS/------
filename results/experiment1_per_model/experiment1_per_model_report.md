@@ -20,9 +20,9 @@
 
 | Метод | Jaccard | Overlap H | Overlap S | Harmonic |
 |------|---------|-----------|-----------|----------|
-| NGRAMS | 0.370 | 0.540 | 0.540 | 0.540 |
-| YAKE | 0.250 | 0.400 | 0.400 | 0.400 |
-| TEXTRANK | 0.250 | 0.400 | 0.400 | 0.400 |
+| NGRAMS | 0.252 | 0.366 | 0.448 | 0.403 |
+| YAKE | 0.055 | 0.101 | 0.109 | 0.105 |
+| TEXTRANK | 0.216 | 0.398 | 0.321 | 0.356 |
 
 - Connectives per 1000 words: HUMAN=15.75, QWEN=14.83
 - Connectives detection: AUC=0.503, Threshold <= 7.71, Acc@thr=0.420
@@ -45,9 +45,9 @@
 
 | Метод | Jaccard | Overlap H | Overlap S | Harmonic |
 |------|---------|-----------|-----------|----------|
-| NGRAMS | 0.389 | 0.560 | 0.560 | 0.560 |
-| YAKE | 0.176 | 0.300 | 0.300 | 0.300 |
-| TEXTRANK | 0.282 | 0.440 | 0.440 | 0.440 |
+| NGRAMS | 0.281 | 0.396 | 0.492 | 0.439 |
+| YAKE | 0.066 | 0.117 | 0.133 | 0.125 |
+| TEXTRANK | 0.229 | 0.474 | 0.306 | 0.372 |
 
 - Connectives per 1000 words: HUMAN=15.75, DEEPSEEK=14.46
 - Connectives detection: AUC=0.491, Threshold <= 8.50, Acc@thr=0.395
@@ -70,9 +70,9 @@
 
 | Метод | Jaccard | Overlap H | Overlap S | Harmonic |
 |------|---------|-----------|-----------|----------|
-| NGRAMS | 0.333 | 0.500 | 0.500 | 0.500 |
-| YAKE | 0.136 | 0.240 | 0.240 | 0.240 |
-| TEXTRANK | 0.282 | 0.440 | 0.440 | 0.440 |
+| NGRAMS | 0.208 | 0.336 | 0.352 | 0.344 |
+| YAKE | 0.031 | 0.061 | 0.061 | 0.061 |
+| TEXTRANK | 0.221 | 0.374 | 0.352 | 0.363 |
 
 - Connectives per 1000 words: HUMAN=15.75, GPTOSS=11.32
 - Connectives detection: AUC=0.387, Threshold <= inf, Acc@thr=0.500
