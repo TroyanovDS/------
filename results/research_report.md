@@ -338,6 +338,35 @@
 | Sentence length std | 11.30 | 10.21 |
 | Gzip ratio | 2.86 | 3.36 |
 
+#### Визуализации результатов
+
+**QWEN:**
+![Overlaps QWEN](experiment1_per_model/qwen_overlaps.png)
+
+*График показывает метрики пересечения ключевых слов (Jaccard, Overlap Human, Overlap Synthetic, Harmonic Mean) для методов NGRAMS, YAKE и TEXTRANK при сравнении HUMAN и QWEN текстов.*
+
+![Connectives и Cosine QWEN](experiment1_per_model/qwen_connectives_cosine.png)
+
+*График показывает распределение частоты connectives и TF-IDF cosine similarity между HUMAN и QWEN текстами.*
+
+**DEEPSEEK:**
+![Overlaps DEEPSEEK](experiment1_per_model/deepseek_overlaps.png)
+
+*График показывает метрики пересечения ключевых слов для методов NGRAMS, YAKE и TEXTRANK при сравнении HUMAN и DEEPSEEK текстов.*
+
+![Connectives и Cosine DEEPSEEK](experiment1_per_model/deepseek_connectives_cosine.png)
+
+*График показывает распределение частоты connectives и TF-IDF cosine similarity между HUMAN и DEEPSEEK текстами.*
+
+**GPTOSS:**
+![Overlaps GPTOSS](experiment1_per_model/gptoss_overlaps.png)
+
+*График показывает метрики пересечения ключевых слов для методов NGRAMS, YAKE и TEXTRANK при сравнении HUMAN и GPTOSS текстов.*
+
+![Connectives и Cosine GPTOSS](experiment1_per_model/gptoss_connectives_cosine.png)
+
+*График показывает распределение частоты connectives и TF-IDF cosine similarity между HUMAN и GPTOSS текстами.*
+
 #### Ключевые выводы:
 
 1. **Умеренные различия в ключевых словах**:
@@ -401,6 +430,60 @@
 | DeepSeek | e5-large-v2 | MLP/LogReg/SVM | 1.000 | 1.000 | 1.000 | 0.000 |
 | GPTOSS | roberta-base | MLP/LogReg/SVM | 1.000 | 1.000 | 1.000 | 0.000 |
 | GPTOSS | albert-base-v2 | MLP/LogReg/SVM | 1.000 | 1.000 | 0.975 | 0.023 |
+
+#### Визуализации результатов
+
+**Общие графики (сводка по всем моделям):**
+![Classification Metrics](experiment2/classification_metrics.png)
+
+*Сравнение метрик классификации (Accuracy, Precision, Recall, F1-score) для всех эмбеддинговых моделей и классификаторов.*
+
+![ROC Curves](experiment2/roc_curves.png)
+
+*ROC-кривые для всех комбинаций эмбеддингов и классификаторов, показывающие качество разделения классов.*
+
+![Confusion Matrices](experiment2/confusion_matrices.png)
+
+*Матрицы ошибок для всех комбинаций, показывающие распределение правильных и неправильных предсказаний.*
+
+**QWEN:**
+![Classification Metrics QWEN](experiment2/classification_metrics_qwen.png)
+
+*Метрики классификации для QWEN текстов: сравнение различных эмбеддингов (BERT, RoBERTa, ALBERT, MPNet, E5) и классификаторов (MLP, Logistic Regression, Linear SVM).*
+
+![ROC Curves QWEN](experiment2/roc_curves_qwen.png)
+
+*ROC-кривые для QWEN текстов, демонстрирующие практически идеальное разделение (AUC=1.000) для лучших моделей.*
+
+![Confusion Matrices QWEN](experiment2/confusion_matrices_qwen.png)
+
+*Матрицы ошибок для QWEN текстов, показывающие точность классификации HUMAN vs AI.*
+
+**DEEPSEEK:**
+![Classification Metrics DEEPSEEK](experiment2/classification_metrics_deepseek.png)
+
+*Метрики классификации для DEEPSEEK текстов: сравнение различных эмбеддингов и классификаторов.*
+
+![ROC Curves DEEPSEEK](experiment2/roc_curves_deepseek.png)
+
+*ROC-кривые для DEEPSEEK текстов, показывающие практически идеальное разделение классов.*
+
+![Confusion Matrices DEEPSEEK](experiment2/confusion_matrices_deepseek.png)
+
+*Матрицы ошибок для DEEPSEEK текстов.*
+
+**GPTOSS:**
+![Classification Metrics GPTOSS](experiment2/classification_metrics_gptoss.png)
+
+*Метрики классификации для GPTOSS текстов: сравнение различных эмбеддингов и классификаторов.*
+
+![ROC Curves GPTOSS](experiment2/roc_curves_gptoss.png)
+
+*ROC-кривые для GPTOSS текстов, демонстрирующие высокое качество разделения.*
+
+![Confusion Matrices GPTOSS](experiment2/confusion_matrices_gptoss.png)
+
+*Матрицы ошибок для GPTOSS текстов.*
 
 #### Ключевые выводы:
 
@@ -543,6 +626,26 @@
    - Классификатор на ключевых словах (Accuracy=0.963) значительно уступает семантическим эмбеддингам (Accuracy=1.000)
    - Но превосходит простые лексические метрики (Jaccard, Overlap)
    - Может использоваться как самостоятельный детектор или компонент ансамбля
+
+#### Визуализации результатов
+
+**Влияние количества ключевых слов (K):**
+![Accuracy по K](experiment4/accuracy_by_k.png)
+
+*Динамика Accuracy в зависимости от количества ключевых слов (K=5, 10, 25, 40, 50) для трех методов извлечения (N-grams, YAKE, TextRank) и трех классификаторов (Logistic Regression, Linear SVM, Random Forest).*
+
+![F1-score по K](experiment4/f1_by_k.png)
+
+*Динамика F1-score в зависимости от K, показывающая баланс между Precision и Recall для различных конфигураций.*
+
+![ROC AUC по K](experiment4/auc_by_k.png)
+
+*Динамика ROC AUC в зависимости от K, демонстрирующая качество разделения классов. Максимальный AUC=0.997 достигается при N-grams + RandomForest + K=50.*
+
+**Сводная визуализация:**
+![Heatmap Accuracy](experiment4/accuracy_heatmap.png)
+
+*Тепловая карта Accuracy по методам извлечения ключевых слов, значениям K и классификаторам. Позволяет быстро определить оптимальные конфигурации.*
 
 ---
 
